@@ -44,6 +44,11 @@ jobs:
           }
           EOF
 
+      - name: Usar chave de assinatura fixa (evita precisar desinstalar)
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+
       - name: Dar permissão de execução ao Gradle
         run: chmod +x android/gradlew
 
