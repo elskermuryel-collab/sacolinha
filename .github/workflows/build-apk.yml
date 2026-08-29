@@ -1,4 +1,4 @@
-name: Build APK (Sacolinha App)
+name: Build APK de HTML Local
 
 on:
   push:
@@ -9,34 +9,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Instalar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Setup JDK
+      - name: Instalar Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
 
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Build Android App
+      - name: Criar package.json e instalar Capacitor
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Upload APK
+      - name: Inicializar e Sincronizar Projeto Android
+        run: |
+          npx cap init "Sacolinha App" "com.bramu.sacolinha" --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Dar permissão de execução ao Gradle
+        run: chmod +x android/gradlew
+
+      - name: Compilar o APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Upload do APK
         uses: actions/upload-artifact@v4
         with:
-          name: sacolinha-apk
+          name: sacolinha-html-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
