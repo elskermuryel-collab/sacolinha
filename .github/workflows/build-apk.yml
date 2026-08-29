@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,6 +25,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - name: Gravar número da versão
+        run: echo "${{ github.run_number }}" > www/version.txt
 
       - name: Criar package.json e instalar Capacitor
         run: |
@@ -55,8 +61,11 @@ jobs:
       - name: Compilar o APK
         run: cd android && ./gradlew assembleDebug --no-daemon
 
-      - name: Upload do APK
-        uses: actions/upload-artifact@v4
+      - name: Publicar Release automaticamente
+        uses: softprops/action-gh-release@v2
         with:
-          name: sacolinha-html-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          tag_name: latest
+          name: "Última versão"
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            www/version.txt

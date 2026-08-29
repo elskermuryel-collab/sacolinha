@@ -905,9 +905,7 @@
     div.textContent = str;
     return div.innerHTML;
   }
-
-  init();
-
+init();
   if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('service-worker.js').catch(()=>{});
@@ -915,5 +913,6 @@
   }
 })();
 </script>
+<script src="update-checker.js"></script>
 </body>
 </html>
