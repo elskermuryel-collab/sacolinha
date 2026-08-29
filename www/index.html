@@ -15,6 +15,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Firebase (usado só no Modo Online / Observador; se falhar ao carregar offline, o app funciona normal do mesmo jeito) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <style>
   /* ============ THEME TOKENS ============ */
   html[data-theme="light"]{
@@ -176,6 +179,78 @@
   }
   .switch-user-mini svg{ width:13px; height:13px; }
   .switch-user-mini:hover{ opacity:1; transform:scale(1.08); }
+
+  /* ---------- MINI HEADER ACTIONS (online/offline + observador) ---------- */
+  .header-mini-actions{
+    position:absolute; right:56px; bottom:14px; z-index:2;
+    display:flex; gap:8px;
+  }
+  .mini-btn{
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(255,255,255,0.10);
+    border:1px solid rgba(255,255,255,0.2);
+    color:var(--header-sub);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0.7;
+    transition:opacity .15s ease, transform .15s ease, background .15s ease;
+  }
+  .mini-btn svg{ width:13px; height:13px; }
+  .mini-btn:hover{ opacity:1; transform:scale(1.08); }
+  .mini-btn.online{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); opacity:1; }
+
+  /* ---------- OBSERVER MODE ---------- */
+  .observer-screen{ min-height:100vh; display:flex; flex-direction:column; }
+  .observer-screen main{ padding-bottom:40px; }
+  .observer-back{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22);
+    color:var(--header-fg); border-radius:20px; padding:7px 14px 7px 10px;
+    font-size:12.5px; font-weight:700; cursor:pointer; margin-bottom:2px;
+  }
+  .observer-back svg{ width:14px; height:14px; }
+  .observer-title{ font-size:22px; color:var(--header-fg); margin-top:8px; }
+  .observer-sub{ font-size:12.5px; color:var(--header-sub); margin-top:2px; }
+  .user-pick-list{ margin-top:18px; display:flex; flex-direction:column; gap:10px; }
+  .user-pick-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:14px 16px; display:flex; align-items:center; gap:12px;
+    cursor:pointer; box-shadow:var(--shadow); transition:transform .15s ease;
+  }
+  .user-pick-card:hover{ transform:translateY(-1px); }
+  .user-pick-card .avatar{
+    width:40px; height:40px; border-radius:50%; flex-shrink:0;
+    background:linear-gradient(145deg, var(--primary-light), var(--primary));
+    color:var(--header-fg); display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:15px;
+  }
+  .user-pick-card .info{ flex:1; min-width:0; }
+  .user-pick-card .info .nm{ font-weight:800; font-size:15px; }
+  .user-pick-card .info .st{ font-size:11.5px; color:var(--ink-faint); margin-top:2px; }
+  .live-dot{
+    width:8px; height:8px; border-radius:50%; background:var(--danger); flex-shrink:0;
+    animation:pulseDot 1.4s ease infinite;
+  }
+  @keyframes pulseDot{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  .observer-empty, .observer-msg{
+    text-align:center; padding:40px 20px; color:var(--ink-soft);
+    background:var(--panel); border:1px solid var(--line); border-radius:20px;
+    margin-top:20px; box-shadow:var(--shadow);
+  }
+  .observer-msg .icon{ font-size:42px; margin-bottom:12px; }
+  .observer-live-head{
+    display:flex; align-items:center; gap:10px; margin:4px 0 18px;
+  }
+  .observer-live-head .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:linear-gradient(145deg, var(--primary-light), var(--primary));
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800;
+  }
+  .observer-live-head h3{ font-size:18px; color:var(--ink); }
+  .observer-live-head .tag{
+    margin-left:auto; display:flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:800; color:var(--danger); text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .item-card.readonly .stamp, .item-card.readonly .del-btn{ pointer-events:none; opacity:0.6; }
 
   main{padding:0 20px; margin-top:14px; position:relative; z-index:2;}
 
@@ -441,7 +516,7 @@
       </div>
       <div class="mark-big">🧺</div>
       <h2>Bem-vindo(a) à Sacolinha</h2>
-      <p class="sub">Sua lista de compras, organizada por categoria, com foto e tudo. Como podemos te chamar?</p>
+      <p class="sub">Vá anotando o que você compra direto no mercado, por categoria e com foto. Como podemos te chamar?</p>
       <div class="field">
         <label for="nameInput">Seu nome</label>
         <input type="text" id="nameInput" placeholder="Ex: Marina" maxlength="30">
@@ -460,6 +535,15 @@
           <button data-theme-btn="vibrant" title="Cores vibrantes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6h1.9A4.7 4.7 0 0 0 21 10.7C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7.2" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="17.2" cy="11.5" r="1.1" fill="currentColor" stroke="none"/></svg></button>
         </div>
       </div>
+      <div class="header-mini-actions">
+        <button class="mini-btn" id="onlineToggleBtn" title="Modo online/offline">
+          <svg id="onlineIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><path d="M5 12.5a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg id="onlineIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5a17 17 0 0 1 4.5-2.8M21 8.5a17 17 0 0 0-8-3.9"/><path d="M5 12.5a11 11 0 0 1 4-2.3"/><path d="M8.5 16a6 6 0 0 1 5-1.7"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/><path d="M2 2l20 20"/></svg>
+        </button>
+        <button class="mini-btn" id="openObserverBtn" title="Modo observador">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <button class="switch-user-mini" id="switchUserBtn" title="Trocar usuário">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l3 3-3 3"/><path d="M19 6H9a4 4 0 0 0-4 4"/><path d="M8 21l-3-3 3-3"/><path d="M5 18h10a4 4 0 0 0 4-4"/></svg>
       </button>
@@ -476,9 +560,9 @@
 
       <div id="emptyState" class="empty-state hidden">
         <div class="icon">🥬</div>
-        <h3>Sua lista está vazia</h3>
-        <p>Crie sua lista de compras adicionando os itens que você precisa.</p>
-        <button class="btn btn-primary" id="createListBtn">+ Criar lista de compra</button>
+        <h3>Nada registrado ainda</h3>
+        <p>Comece a anotar os itens conforme for colocando eles no carrinho.</p>
+        <button class="btn btn-primary" id="createListBtn">+ Anotar item comprado</button>
       </div>
 
       <div id="listContainer"></div>
@@ -490,13 +574,53 @@
   </div>
 
   <button class="fab hidden" id="fabAdd" title="Adicionar item">+</button>
+
+  <!-- OBSERVER SCREEN -->
+  <div id="observerScreen" class="observer-screen hidden">
+    <header class="top">
+      <button class="observer-back" id="observerBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </button>
+      <h2 class="observer-title">👀 Modo observador</h2>
+      <p class="observer-sub" id="observerSub">Veja a lista de outra pessoa em tempo real.</p>
+    </header>
+    <main>
+      <div id="observerOfflineMsg" class="observer-msg hidden">
+        <div class="icon">📡</div>
+        <h3 style="color:var(--primary); font-size:19px; margin-bottom:6px;">Você está no modo offline</h3>
+        <p style="font-size:13.5px; line-height:1.5; margin-bottom:20px;">Pra ver a lista de alguém ao vivo é preciso internet. Ative o modo online no topo da tela.</p>
+        <button class="btn btn-primary" id="goOnlineFromObserverBtn">Ativar modo online</button>
+      </div>
+
+      <div id="observerPickWrap" class="hidden">
+        <div id="userPickList" class="user-pick-list"></div>
+        <div id="userPickEmpty" class="observer-empty hidden">
+          <div class="icon" style="font-size:38px;">🙈</div>
+          <p style="font-size:13.5px;">Ninguém mais sincronizou uma lista ainda. Peça pra pessoa ativar o modo online no aparelho dela.</p>
+        </div>
+      </div>
+
+      <div id="observerLiveWrap" class="hidden">
+        <div class="observer-live-head">
+          <div class="avatar" id="observerLiveAvatar">?</div>
+          <h3 id="observerLiveName">—</h3>
+          <span class="tag"><span class="live-dot"></span> ao vivo</span>
+        </div>
+        <div id="observerLiveList"></div>
+        <div id="observerLiveEmpty" class="observer-empty hidden">
+          <p style="font-size:13.5px;">A lista dessa pessoa está vazia por enquanto.</p>
+        </div>
+      </div>
+    </main>
+  </div>
 </div>
 
 <!-- MODAL: ADD ITEM -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-head">
-      <h2>Novo item</h2>
+      <h2>Anotar item</h2>
       <button id="closeModalBtn">✕</button>
     </div>
 
@@ -549,9 +673,9 @@
 
     <div class="modal-actions">
       <button class="btn btn-outline btn-block" id="finishAddBtn">Concluir</button>
-      <button class="btn btn-primary btn-block" id="saveItemBtn">Criar</button>
+      <button class="btn btn-primary btn-block" id="saveItemBtn">Anotar</button>
     </div>
-    <p class="field-hint" style="text-align:center; margin-top:10px;">Cada item é salvo assim que você clica em "Criar". Pode adicionar quantos quiser.</p>
+    <p class="field-hint" style="text-align:center; margin-top:10px;">Cada item já entra como comprado assim que você clica em "Anotar". Pode desmarcar se colocou por engano.</p>
   </div>
 </div>
 
@@ -634,9 +758,217 @@
     }catch(e){ showToast('Erro ao salvar.'); return null; }
   }
 
+  /* ============================================================
+     MODO ONLINE / OBSERVADOR (Firebase Realtime Database)
+     - Offline: zero acesso à internet, só localStorage.
+     - Online: manda só o item que mudou (não a lista inteira),
+       e só busca a lista de alguém quando você abre a tela dela.
+     ============================================================ */
+
+  // 1) Crie um projeto grátis em https://console.firebase.google.com
+  // 2) Ative "Realtime Database" (modo teste ou com as regras do README)
+  // 3) Cole aqui a configuração do seu projeto (Configurações > Geral > Seus apps > SDK)
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBvgGTe3jkzSQvpAvrHEsmaU-4QtnAm4_E",
+    authDomain: "sacolinha-4b583.firebaseapp.com",
+    databaseURL: "https://sacolinha-4b583-default-rtdb.firebaseio.com",
+    projectId: "sacolinha-4b583",
+    storageBucket: "sacolinha-4b583.firebasestorage.app",
+    messagingSenderId: "288898188412",
+    appId: "1:288898188412:web:a09ef08b337a8c005235f9"
+  };
+  const FIREBASE_READY = FIREBASE_CONFIG.apiKey !== "COLE_AQUI" && typeof firebase !== 'undefined';
+
+  let onlineMode = false;
+  let currentUid = null;
+  let dbApp = null;
+  let observerListRef = null;
+  let observerActiveUid = null;
+
+  function slugify(str){
+    return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'usuario';
+  }
+
+  function ensureFirebase(){
+    if(!FIREBASE_READY) return false;
+    try{
+      if(!dbApp) dbApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function setOnlineUI(isOn){
+    $('onlineToggleBtn').classList.toggle('online', isOn);
+    $('onlineIconOn').classList.toggle('hidden', !isOn);
+    $('onlineIconOff').classList.toggle('hidden', isOn);
+    $('onlineToggleBtn').title = isOn ? 'Online (toque para ficar offline)' : 'Offline (toque para ficar online)';
+  }
+
+  async function setOnlineMode(isOn, opts){
+    opts = opts || {};
+    onlineMode = isOn;
+    await storageSet('user:onlineMode', isOn ? '1' : '0');
+    setOnlineUI(isOn);
+
+    if(!ensureFirebase()){
+      if(isOn && !opts.silent) showToast('Sincronização não configurada ainda neste app.');
+      return;
+    }
+
+    if(isOn){
+      firebase.database().goOnline();
+      if(userName) await fullSyncToCloud();
+    }else{
+      detachObserverListener();
+      firebase.database().goOffline();
+      if(!opts.silent) showToast('Modo offline: nenhuma internet é usada.');
+    }
+  }
+
+  async function fullSyncToCloud(){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    currentUid = slugify(userName);
+    const itemsObj = {};
+    items.forEach(it => itemsObj[it.id] = it);
+    try{
+      const db = firebase.database();
+      await db.ref('usuarios/'+currentUid).set({ nome: userName, atualizadoEm: Date.now() });
+      await db.ref('listas/'+currentUid+'/itens').set(itemsObj);
+      db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
+      db.ref('usuarios/'+currentUid+'/online').set(true);
+    }catch(e){ /* sem internet no momento — segue só local */ }
+  }
+
+  async function syncItemToCloud(item){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    currentUid = slugify(userName);
+    try{
+      await firebase.database().ref('listas/'+currentUid+'/itens/'+item.id).set(item);
+      await firebase.database().ref('usuarios/'+currentUid).update({ nome: userName, atualizadoEm: Date.now() });
+    }catch(e){}
+  }
+  async function removeItemFromCloud(id){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    currentUid = slugify(userName);
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove(); }catch(e){}
+  }
+  async function clearCloudList(){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    currentUid = slugify(userName);
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); }catch(e){}
+  }
+
+  /* ---------- Tela do observador ---------- */
+  function detachObserverListener(){
+    if(observerListRef) observerListRef.off();
+    observerListRef = null;
+    observerActiveUid = null;
+  }
+
+  $('openObserverBtn').addEventListener('click', openObserverScreen);
+  $('observerBackBtn').addEventListener('click', closeObserverScreen);
+  $('goOnlineFromObserverBtn').addEventListener('click', async ()=>{
+    await setOnlineMode(true);
+    openObserverScreen();
+  });
+  $('onlineToggleBtn').addEventListener('click', ()=> setOnlineMode(!onlineMode));
+
+  function openObserverScreen(){
+    mainScreen.classList.add('hidden');
+    $('observerScreen').classList.remove('hidden');
+    $('observerLiveWrap').classList.add('hidden');
+    detachObserverListener();
+
+    if(!onlineMode || !ensureFirebase()){
+      $('observerOfflineMsg').classList.remove('hidden');
+      $('observerPickWrap').classList.add('hidden');
+      return;
+    }
+    $('observerOfflineMsg').classList.add('hidden');
+    $('observerPickWrap').classList.remove('hidden');
+    loadUserPickList();
+  }
+  function closeObserverScreen(){
+    detachObserverListener();
+    $('observerScreen').classList.add('hidden');
+    mainScreen.classList.remove('hidden');
+  }
+
+  async function loadUserPickList(){
+    const wrap = $('userPickList');
+    wrap.innerHTML = '';
+    try{
+      const snap = await firebase.database().ref('usuarios').once('value');
+      const data = snap.val() || {};
+      const myUid = slugify(userName || '');
+      const others = Object.entries(data).filter(([uid]) => uid !== myUid);
+      $('userPickEmpty').classList.toggle('hidden', others.length > 0);
+      others.forEach(([uid, info])=>{
+        const card = document.createElement('div');
+        card.className = 'user-pick-card';
+        const initials = (info.nome || uid).slice(0,1).toUpperCase();
+        card.innerHTML =
+          '<div class="avatar">'+initials+'</div>'+
+          '<div class="info"><div class="nm">'+escapeHtml(info.nome || uid)+'</div>'+
+          '<div class="st">'+(info.online ? 'ativo agora' : 'última atualização recente')+'</div></div>'+
+          (info.online ? '<span class="live-dot"></span>' : '');
+        card.addEventListener('click', ()=> selectObserverUser(uid, info.nome || uid));
+        wrap.appendChild(card);
+      });
+    }catch(e){
+      showToast('Não foi possível buscar as listas agora.');
+    }
+  }
+
+  function selectObserverUser(uid, nome){
+    detachObserverListener();
+    observerActiveUid = uid;
+    $('observerPickWrap').classList.add('hidden');
+    $('observerLiveWrap').classList.remove('hidden');
+    $('observerLiveAvatar').textContent = nome.slice(0,1).toUpperCase();
+    $('observerLiveName').textContent = nome;
+
+    observerListRef = firebase.database().ref('listas/'+uid+'/itens');
+    observerListRef.on('value', (snap)=>{
+      const data = snap.val() || {};
+      renderObserverItems(Object.values(data));
+    });
+  }
+
+  function renderObserverItems(list){
+    const holder = $('observerLiveList');
+    holder.innerHTML = '';
+    $('observerLiveEmpty').classList.toggle('hidden', list.length > 0);
+    list.sort((a,b)=> (b.criadoEm||0) - (a.criadoEm||0));
+    list.forEach(it=>{
+      const cat = CAT_BY_KEY[it.categoria] || CATEGORIES[CATEGORIES.length-1];
+      const card = document.createElement('div');
+      card.className = 'item-card readonly' + (it.comprado ? ' done' : '');
+      card.style.setProperty('--cat-color', cat.color);
+      const thumbHtml = it.foto ? '<img class="thumb" src="'+it.foto+'">' : '<div class="thumb placeholder">'+cat.emoji+'</div>';
+      const qtyLabel = it.quantidade + ' ' + (UNIT_LABEL[it.unidade] || it.unidade);
+      card.innerHTML =
+        thumbHtml +
+        '<div class="item-info">'+
+          '<div class="name">'+escapeHtml(it.nome)+'</div>'+
+          '<div class="meta">'+qtyLabel+' · '+cat.emoji+' '+cat.label+'</div>'+
+          (it.observacao ? '<div class="obs">"'+escapeHtml(it.observacao)+'"</div>' : '') +
+        '</div>'+
+        '<div class="stamp'+(it.comprado ? ' checked' : '')+'">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'+
+        '</div>';
+      holder.appendChild(card);
+    });
+  }
+
   async function init(){
     const savedTheme = await storageGet('user:theme');
     applyTheme(savedTheme || 'light', false);
+
+    const savedOnline = await storageGet('user:onlineMode');
+    onlineMode = savedOnline === '1';
+    setOnlineUI(onlineMode);
 
     const name = await storageGet('user:name');
     if(name){
@@ -645,6 +977,7 @@
       try{ items = raw ? JSON.parse(raw) : []; }catch(e){ items = []; }
       celebrated = items.length > 0 && items.every(i=>i.comprado);
       enterApp();
+      if(onlineMode) setOnlineMode(true, {silent:true});
     }else{
       welcomeScreen.classList.remove('hidden');
       mainScreen.classList.add('hidden');
@@ -667,6 +1000,7 @@
       try{ items = raw ? JSON.parse(raw) : []; }catch(e){ items = []; }
     }
     enterApp();
+    if(onlineMode) fullSyncToCloud();
   });
   $('nameInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') $('startBtn').click(); });
 
@@ -684,6 +1018,7 @@
     celebrated = false;
     await storageSet('shopping:items', JSON.stringify(items));
     render();
+    clearCloudList();
     showToast('Lista limpa. Pode começar uma nova!');
   });
 
@@ -768,13 +1103,14 @@
     const newItem = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       nome: name, quantidade: qty, unidade: unit, categoria: selectedCategory,
-      observacao: obs, foto: selectedPhoto, comprado: false, criadoEm: Date.now()
+      observacao: obs, foto: selectedPhoto, comprado: true, criadoEm: Date.now()
     };
     items.push(newItem);
     celebrated = false;
     await storageSet('shopping:items', JSON.stringify(items));
     render();
-    showToast('Item adicionado!');
+    syncItemToCloud(newItem);
+    showToast('Item anotado!');
 
     $('itemName').value = '';
     $('itemQty').value = '1';
@@ -792,12 +1128,14 @@
     if(it){ it.comprado = !it.comprado; }
     await storageSet('shopping:items', JSON.stringify(items));
     render();
+    if(it) syncItemToCloud(it);
   }
   async function deleteItem(id){
     items = items.filter(i=>i.id !== id);
     celebrated = false;
     await storageSet('shopping:items', JSON.stringify(items));
     render();
+    removeItemFromCloud(id);
   }
 
   function launchConfetti(){
