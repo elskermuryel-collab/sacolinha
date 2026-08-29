@@ -210,6 +210,15 @@
   .observer-back svg{ width:14px; height:14px; }
   .observer-title{ font-size:22px; color:var(--header-fg); margin-top:8px; }
   .observer-sub{ font-size:12.5px; color:var(--header-sub); margin-top:2px; }
+  .data-usage-row{
+    display:flex; align-items:center; gap:10px; margin-top:12px;
+    font-size:11.5px; color:var(--header-sub); opacity:0.9;
+  }
+  .data-usage-row button{
+    background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.25);
+    color:var(--header-fg); border-radius:20px; padding:3px 11px; font-size:10.5px;
+    font-weight:700; cursor:pointer;
+  }
   .user-pick-list{ margin-top:18px; display:flex; flex-direction:column; gap:10px; }
   .user-pick-card{
     background:var(--panel); border:1px solid var(--line); border-radius:16px;
@@ -335,6 +344,35 @@
     position:relative;
   }
   .bar-fill.full{ background:linear-gradient(90deg, var(--primary-light), var(--primary)); }
+
+  .total-card{
+    display:flex; justify-content:space-between; align-items:baseline;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:12px 16px; margin-top:4px; box-shadow:var(--shadow);
+  }
+  .total-card span{ font-size:12.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+  .total-card strong{ font-size:19px; color:var(--primary); font-family:'Fraunces'; }
+
+  .broadcast-card{
+    background:var(--panel-soft); border:1.5px dashed var(--line); border-radius:16px;
+    padding:14px 16px; margin-top:12px;
+  }
+  .broadcast-row{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:9px; }
+  .broadcast-input-row{ display:flex; gap:8px; }
+  .broadcast-input-row input{ flex:1; padding:11px 12px; }
+  .broadcast-input-row .btn{ padding:11px 16px; font-size:13px; }
+
+  .item-price{ font-size:12px; font-weight:800; color:var(--accent-dark); margin-top:2px; }
+
+  .observer-message{
+    background:var(--panel-soft); border:1.5px solid var(--accent);
+    border-radius:14px; padding:12px 14px; margin-bottom:16px;
+    font-size:13.5px; color:var(--ink); display:flex; gap:9px; align-items:flex-start;
+  }
+  .observer-message .em{ font-size:17px; flex-shrink:0; }
+  .observer-message .txt{ flex:1; }
+  .observer-message .when{ font-size:11px; color:var(--ink-faint); margin-top:3px; }
+  .observer-total{ font-size:12.5px; color:var(--ink-soft); font-weight:700; margin:-6px 0 16px; }
 
   /* ---------- EMPTY STATE ---------- */
   .empty-state{
@@ -558,6 +596,22 @@
         <div class="bar"><div class="bar-fill" id="progressFill" style="width:0%"></div></div>
       </div>
 
+      <div class="total-card hidden" id="totalCard">
+        <span>Total da lista</span>
+        <strong id="totalValue">R$ 0,00</strong>
+      </div>
+
+      <div class="broadcast-card hidden" id="broadcastCard">
+        <div class="broadcast-row">
+          <span>📢 Avisar quem está observando</span>
+        </div>
+        <div class="broadcast-input-row">
+          <input type="text" id="broadcastInput" maxlength="120" placeholder="Ex: chegando em 10 min...">
+          <button class="btn btn-primary" id="broadcastSendBtn">Enviar</button>
+        </div>
+        <p class="field-hint" id="broadcastHint" style="margin-top:6px;"></p>
+      </div>
+
       <div id="emptyState" class="empty-state hidden">
         <div class="icon">🥬</div>
         <h3>Nada registrado ainda</h3>
@@ -584,6 +638,10 @@
       </button>
       <h2 class="observer-title">👀 Modo observador</h2>
       <p class="observer-sub" id="observerSub">Veja a lista de outra pessoa em tempo real.</p>
+      <div class="data-usage-row">
+        <span id="dataUsageText">📶 0 KB usados</span>
+        <button id="resetDataUsageBtn">Zerar</button>
+      </div>
     </header>
     <main>
       <div id="observerOfflineMsg" class="observer-msg hidden">
@@ -607,6 +665,14 @@
           <h3 id="observerLiveName">—</h3>
           <span class="tag"><span class="live-dot"></span> ao vivo</span>
         </div>
+        <div id="observerMessageBox" class="observer-message hidden">
+          <span class="em">📢</span>
+          <div class="txt">
+            <div id="observerMessageText"></div>
+            <div class="when" id="observerMessageWhen"></div>
+          </div>
+        </div>
+        <div class="observer-total" id="observerTotal"></div>
         <div id="observerLiveList"></div>
         <div id="observerLiveEmpty" class="observer-empty hidden">
           <p style="font-size:13.5px;">A lista dessa pessoa está vazia por enquanto.</p>
@@ -647,6 +713,11 @@
           <option value="cx">Caixa</option>
         </select>
       </div>
+    </div>
+
+    <div class="field">
+      <label for="itemPrice">Preço unitário <span style="font-weight:400; text-transform:none; color:var(--ink-faint);">(opcional)</span></label>
+      <input type="number" id="itemPrice" min="0" step="0.01" placeholder="Ex: 7.90" inputmode="decimal">
     </div>
 
     <div class="field">
@@ -783,12 +854,43 @@
   let currentUid = null;
   let dbApp = null;
   let observerListRef = null;
+  let observerMsgRef = null;
   let observerActiveUid = null;
+  let dataUsageBytes = 0;
 
   function slugify(str){
     return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'usuario';
   }
+
+  /* ---------- Contador de dados (baseado no tamanho real de cada payload enviado/recebido) ---------- */
+  function byteSize(obj){
+    try{ return new TextEncoder().encode(JSON.stringify(obj)).length; }
+    catch(e){ return JSON.stringify(obj).length; }
+  }
+  function formatBytes(n){
+    n = n || 0;
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    if(n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + ' MB';
+    return (n/1024/1024/1024).toFixed(2) + ' GB';
+  }
+  function updateDataUsageUI(){
+    const el = $('dataUsageText');
+    if(el) el.textContent = '📶 ' + formatBytes(dataUsageBytes) + ' usados';
+  }
+  async function trackData(bytes){
+    dataUsageBytes += Math.max(0, bytes|0);
+    await storageSet('data:usageBytes', String(dataUsageBytes));
+    updateDataUsageUI();
+  }
+  $('resetDataUsageBtn').addEventListener('click', async ()=>{
+    if(!confirm('Zerar o contador de dados usados?')) return;
+    dataUsageBytes = 0;
+    await storageSet('data:usageBytes', '0');
+    updateDataUsageUI();
+    showToast('Contador zerado.');
+  });
 
   function ensureFirebase(){
     if(!FIREBASE_READY) return false;
@@ -810,6 +912,7 @@
     onlineMode = isOn;
     await storageSet('user:onlineMode', isOn ? '1' : '0');
     setOnlineUI(isOn);
+    if(userName) render();
 
     if(!ensureFirebase()){
       if(isOn && !opts.silent) showToast('Sincronização não configurada ainda neste app.');
@@ -833,10 +936,12 @@
     items.forEach(it => itemsObj[it.id] = it);
     try{
       const db = firebase.database();
-      await db.ref('usuarios/'+currentUid).set({ nome: userName, atualizadoEm: Date.now() });
+      const meta = { nome: userName, atualizadoEm: Date.now() };
+      await db.ref('usuarios/'+currentUid).set(meta);
       await db.ref('listas/'+currentUid+'/itens').set(itemsObj);
       db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
       db.ref('usuarios/'+currentUid+'/online').set(true);
+      trackData(byteSize(itemsObj) + byteSize(meta));
     }catch(e){ /* sem internet no momento — segue só local */ }
   }
 
@@ -846,23 +951,41 @@
     try{
       await firebase.database().ref('listas/'+currentUid+'/itens/'+item.id).set(item);
       await firebase.database().ref('usuarios/'+currentUid).update({ nome: userName, atualizadoEm: Date.now() });
+      trackData(byteSize(item) + 30);
     }catch(e){}
   }
   async function removeItemFromCloud(id){
     if(!onlineMode || !ensureFirebase() || !userName) return;
     currentUid = slugify(userName);
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove(); }catch(e){}
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove(); trackData(30); }catch(e){}
   }
   async function clearCloudList(){
     if(!onlineMode || !ensureFirebase() || !userName) return;
     currentUid = slugify(userName);
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); }catch(e){}
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); }catch(e){}
   }
+  async function sendBroadcastMessage(){
+    const texto = $('broadcastInput').value.trim();
+    if(!texto) return;
+    if(!onlineMode || !ensureFirebase() || !userName){ showToast('Ative o modo online pra enviar.'); return; }
+    currentUid = slugify(userName);
+    const msg = { texto: texto, criadoEm: Date.now() };
+    try{
+      await firebase.database().ref('listas/'+currentUid+'/mensagem').set(msg);
+      trackData(byteSize(msg));
+      showToast('Mensagem enviada para quem estiver observando!');
+      $('broadcastInput').value = '';
+    }catch(e){ showToast('Não foi possível enviar agora.'); }
+  }
+  $('broadcastSendBtn').addEventListener('click', sendBroadcastMessage);
+  $('broadcastInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') sendBroadcastMessage(); });
 
   /* ---------- Tela do observador ---------- */
   function detachObserverListener(){
     if(observerListRef) observerListRef.off();
+    if(observerMsgRef) observerMsgRef.off();
     observerListRef = null;
+    observerMsgRef = null;
     observerActiveUid = null;
   }
 
@@ -901,6 +1024,7 @@
     try{
       const snap = await firebase.database().ref('usuarios').once('value');
       const data = snap.val() || {};
+      trackData(byteSize(data));
       const myUid = slugify(userName || '');
       const others = Object.entries(data).filter(([uid]) => uid !== myUid);
       $('userPickEmpty').classList.toggle('hidden', others.length > 0);
@@ -928,18 +1052,37 @@
     $('observerLiveWrap').classList.remove('hidden');
     $('observerLiveAvatar').textContent = nome.slice(0,1).toUpperCase();
     $('observerLiveName').textContent = nome;
+    $('observerMessageBox').classList.add('hidden');
 
     observerListRef = firebase.database().ref('listas/'+uid+'/itens');
     observerListRef.on('value', (snap)=>{
       const data = snap.val() || {};
+      trackData(byteSize(data));
       renderObserverItems(Object.values(data));
     });
+
+    observerMsgRef = firebase.database().ref('listas/'+uid+'/mensagem');
+    observerMsgRef.on('value', (snap)=>{
+      const data = snap.val();
+      trackData(byteSize(data || {}));
+      renderObserverMessage(data);
+    });
+  }
+
+  function renderObserverMessage(data){
+    const box = $('observerMessageBox');
+    if(!data || !data.texto){ box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    $('observerMessageText').textContent = data.texto;
+    const when = data.criadoEm ? new Date(data.criadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+    $('observerMessageWhen').textContent = when ? ('enviado às ' + when) : '';
   }
 
   function renderObserverItems(list){
     const holder = $('observerLiveList');
     holder.innerHTML = '';
     $('observerLiveEmpty').classList.toggle('hidden', list.length > 0);
+    $('observerTotal').textContent = list.length ? ('Total da lista: ' + formatBRL(listTotal(list))) : '';
     list.sort((a,b)=> (b.criadoEm||0) - (a.criadoEm||0));
     list.forEach(it=>{
       const cat = CAT_BY_KEY[it.categoria] || CATEGORIES[CATEGORIES.length-1];
@@ -948,11 +1091,13 @@
       card.style.setProperty('--cat-color', cat.color);
       const thumbHtml = it.foto ? '<img class="thumb" src="'+it.foto+'">' : '<div class="thumb placeholder">'+cat.emoji+'</div>';
       const qtyLabel = it.quantidade + ' ' + (UNIT_LABEL[it.unidade] || it.unidade);
+      const priceHtml = it.preco ? '<div class="item-price">'+formatBRL(it.preco)+' un · '+formatBRL(it.preco*it.quantidade)+' total</div>' : '';
       card.innerHTML =
         thumbHtml +
         '<div class="item-info">'+
           '<div class="name">'+escapeHtml(it.nome)+'</div>'+
           '<div class="meta">'+qtyLabel+' · '+cat.emoji+' '+cat.label+'</div>'+
+          priceHtml +
           (it.observacao ? '<div class="obs">"'+escapeHtml(it.observacao)+'"</div>' : '') +
         '</div>'+
         '<div class="stamp'+(it.comprado ? ' checked' : '')+'">'+
@@ -969,6 +1114,10 @@
     const savedOnline = await storageGet('user:onlineMode');
     onlineMode = savedOnline === '1';
     setOnlineUI(onlineMode);
+
+    const savedUsage = await storageGet('data:usageBytes');
+    dataUsageBytes = parseInt(savedUsage, 10) || 0;
+    updateDataUsageUI();
 
     const name = await storageGet('user:name');
     if(name){
@@ -1046,6 +1195,7 @@
     $('itemName').value = '';
     $('itemQty').value = '1';
     $('itemUnit').value = 'un';
+    $('itemPrice').value = '';
     $('itemObs').value = '';
     $('photoPreview').classList.add('hidden');
     $('photoInputWrap').classList.remove('hidden');
@@ -1098,11 +1248,12 @@
     if(!name){ showToast('Digite o nome do item.'); $('itemName').focus(); return; }
     const qty = parseFloat($('itemQty').value) || 1;
     const unit = $('itemUnit').value;
+    const preco = parseFloat($('itemPrice').value) || 0;
     const obs = $('itemObs').value.trim();
 
     const newItem = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      nome: name, quantidade: qty, unidade: unit, categoria: selectedCategory,
+      nome: name, quantidade: qty, unidade: unit, preco: preco, categoria: selectedCategory,
       observacao: obs, foto: selectedPhoto, comprado: true, criadoEm: Date.now()
     };
     items.push(newItem);
@@ -1114,6 +1265,7 @@
 
     $('itemName').value = '';
     $('itemQty').value = '1';
+    $('itemPrice').value = '';
     $('itemObs').value = '';
     selectedPhoto = null;
     $('photoInput').value = '';
@@ -1153,6 +1305,12 @@
   }
 
   /* ---------- Render ---------- */
+  function formatBRL(v){
+    return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function listTotal(list){
+    return list.reduce((sum,it)=> sum + (parseFloat(it.preco)||0) * (parseFloat(it.quantidade)||0), 0);
+  }
   function render(){
     const total = items.length;
     const done = items.filter(i=>i.comprado).length;
@@ -1161,6 +1319,16 @@
     $('progressPct').textContent = pct + '%';
     $('progressFill').style.width = pct + '%';
     $('progressFill').classList.toggle('full', pct === 100 && total > 0);
+
+    const grandTotal = listTotal(items);
+    $('totalCard').classList.toggle('hidden', total === 0);
+    $('totalValue').textContent = formatBRL(grandTotal);
+
+    $('broadcastCard').classList.remove('hidden');
+    $('broadcastHint').textContent = onlineMode
+      ? 'Quem estiver te observando vê essa mensagem na hora.'
+      : 'Só funciona com o modo online ligado 🌐.';
+    $('broadcastSendBtn').disabled = !onlineMode;
 
     if(total > 0 && done === total && !celebrated){
       celebrated = true;
@@ -1208,12 +1376,14 @@
         }
 
         const qtyLabel = it.quantidade + ' ' + (UNIT_LABEL[it.unidade] || it.unidade);
+        const priceHtml = it.preco ? '<div class="item-price">'+formatBRL(it.preco)+' un · '+formatBRL(it.preco*it.quantidade)+' total</div>' : '';
 
         card.innerHTML =
           thumbHtml +
           '<div class="item-info">'+
             '<div class="name">'+escapeHtml(it.nome)+'</div>'+
             '<div class="meta">'+qtyLabel+'</div>'+
+            priceHtml +
             (it.observacao ? '<div class="obs">"'+escapeHtml(it.observacao)+'"</div>' : '') +
           '</div>'+
           '<div class="stamp'+(it.comprado ? ' checked' : '')+'" data-id="'+it.id+'">'+

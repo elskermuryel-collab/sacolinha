@@ -40,6 +40,11 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Fixar versionCode crescente (evita conflito de "downgrade" na instalação)
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+
       - name: Corrigir conflito de dependência Kotlin
         run: |
           cat <<'EOF' >> android/app/build.gradle
