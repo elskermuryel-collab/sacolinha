@@ -18,6 +18,9 @@
 <!-- Firebase (usado só no Modo Online / Observador; se falhar ao carregar offline, o app funciona normal do mesmo jeito) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<!-- Leaflet (mapa ao vivo do rastreador de localização; sem chave de API. Se falhar ao carregar, o app cai pro link "Abrir no Google Maps" e segue funcionando normal) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   /* ============ THEME TOKENS ============ */
   html[data-theme="light"]{
@@ -362,6 +365,38 @@
   .broadcast-input-row input{ flex:1; padding:11px 12px; }
   .broadcast-input-row .btn{ padding:11px 16px; font-size:13px; }
 
+  .quick-status-row{ display:flex; gap:7px; margin-bottom:10px; flex-wrap:wrap; }
+  .quick-status-btn{
+    flex:1; min-width:96px;
+    border:1.5px solid var(--line); background:var(--panel);
+    color:var(--ink); font-family:'Manrope'; font-weight:700; font-size:11.5px;
+    border-radius:12px; padding:9px 8px; cursor:pointer; text-align:center;
+    transition:transform .12s ease, filter .12s ease, border-color .12s ease;
+  }
+  .quick-status-btn:hover{ border-color:var(--primary); filter:brightness(1.03); }
+  .quick-status-btn:active{ transform:scale(0.96); }
+  .quick-status-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .mini-btn.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); opacity:1; }
+
+  .observer-location-wrap{ margin-bottom:16px; }
+  .observer-map{
+    width:100%; height:210px; border-radius:14px 14px 0 0;
+    border:1px solid var(--line); border-bottom:none;
+    overflow:hidden; background:var(--line-soft);
+  }
+  .observer-map.hidden{ display:none; }
+  .observer-location{
+    background:var(--panel-soft); border:1.5px solid var(--primary);
+    border-radius:0 0 14px 14px;
+    padding:12px 14px;
+    font-size:13.5px; color:var(--ink); display:flex; gap:9px; align-items:center;
+  }
+  .observer-location-wrap:has(.observer-map.hidden) .observer-location{ border-radius:14px; }
+  .observer-location .em{ font-size:17px; flex-shrink:0; }
+  .observer-location .txt{ flex:1; }
+  .observer-location .when{ font-size:11px; color:var(--ink-faint); margin-top:2px; }
+
   .item-price{ font-size:12px; font-weight:800; color:var(--accent-dark); margin-top:2px; }
 
   .observer-message{
@@ -373,6 +408,18 @@
   .observer-message .txt{ flex:1; }
   .observer-message .when{ font-size:11px; color:var(--ink-faint); margin-top:3px; }
   .observer-total{ font-size:12.5px; color:var(--ink-soft); font-weight:700; margin:-6px 0 16px; }
+
+  .observer-receipt{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; margin-bottom:16px; box-shadow:var(--shadow);
+  }
+  .observer-receipt-head{ display:flex; gap:9px; align-items:center; margin-bottom:10px; font-size:13.5px; color:var(--ink); }
+  .observer-receipt-head .em{ font-size:17px; flex-shrink:0; }
+  .observer-receipt-head .txt{ flex:1; font-weight:700; }
+  .observer-receipt-head .when{ font-size:11px; color:var(--ink-faint); font-weight:500; margin-top:2px; }
+  .observer-receipt img{
+    width:100%; display:block; border-radius:10px; border:1px solid var(--line-soft); cursor:zoom-in;
+  }
 
   /* ---------- EMPTY STATE ---------- */
   .empty-state{
@@ -581,6 +628,9 @@
         <button class="mini-btn" id="openObserverBtn" title="Modo observador">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
+        <button class="mini-btn" id="locToggleBtn" title="Compartilhar localização">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+        </button>
       </div>
       <button class="switch-user-mini" id="switchUserBtn" title="Trocar usuário">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l3 3-3 3"/><path d="M19 6H9a4 4 0 0 0-4 4"/><path d="M8 21l-3-3 3-3"/><path d="M5 18h10a4 4 0 0 0 4-4"/></svg>
@@ -601,9 +651,22 @@
         <strong id="totalValue">R$ 0,00</strong>
       </div>
 
+      <div id="mainRecadoBox" class="observer-message hidden">
+        <span class="em">💬</span>
+        <div class="txt">
+          <div id="mainRecadoText"></div>
+          <div class="when" id="mainRecadoWhen"></div>
+        </div>
+      </div>
+
       <div class="broadcast-card hidden" id="broadcastCard">
         <div class="broadcast-row">
           <span>📢 Avisar quem está observando</span>
+        </div>
+        <div class="quick-status-row">
+          <button class="quick-status-btn" id="statusFinalizarBtn" data-status="🛍️ Finalizei a compra, já vou pro caixa!">🛍️ Finalizar compra</button>
+          <button class="quick-status-btn" id="statusCarrinhoBtn" data-status="✅ Carrinho finalizado, pagando agora!">✅ Carrinho finalizado</button>
+          <button class="quick-status-btn" id="statusUberBtn" data-status="🚕 Pedi um Uber, já estou a caminho!">🚕 Pedido Uber</button>
         </div>
         <div class="broadcast-input-row">
           <input type="text" id="broadcastInput" maxlength="120" placeholder="Ex: chegando em 10 min...">
@@ -665,11 +728,43 @@
           <h3 id="observerLiveName">—</h3>
           <span class="tag"><span class="live-dot"></span> ao vivo</span>
         </div>
+        <div class="broadcast-card" id="observerReplyCard">
+          <div class="broadcast-row">
+            <span>💬 Mandar recado pra ela(e)</span>
+          </div>
+          <div class="broadcast-input-row">
+            <input type="text" id="observerReplyInput" maxlength="120" placeholder="Ex: precisa de mais alguma coisa?">
+            <button class="btn btn-primary" id="observerReplySendBtn">Enviar</button>
+          </div>
+        </div>
         <div id="observerMessageBox" class="observer-message hidden">
           <span class="em">📢</span>
           <div class="txt">
             <div id="observerMessageText"></div>
             <div class="when" id="observerMessageWhen"></div>
+          </div>
+        </div>
+        <div id="observerReceiptBox" class="observer-receipt hidden">
+          <div class="observer-receipt-head">
+            <span class="em">🧾</span>
+            <div class="txt">
+              <div>Recibo da compra</div>
+              <div class="when" id="observerReceiptWhen"></div>
+            </div>
+          </div>
+          <a id="observerReceiptLink" target="_blank" rel="noopener">
+            <img id="observerReceiptImg" alt="Recibo da compra">
+          </a>
+        </div>
+        <div id="observerLocationBox" class="observer-location-wrap hidden">
+          <div id="observerMap" class="observer-map hidden"></div>
+          <div class="observer-location">
+            <span class="em" id="observerLocationEmoji">📍</span>
+            <div class="txt">
+              <div id="observerLocationSpeed">Localização compartilhada</div>
+              <div class="when" id="observerLocationWhen"></div>
+            </div>
+            <a class="btn btn-outline" id="observerLocationLink" target="_blank" rel="noopener" style="padding:9px 14px; font-size:12.5px;">Abrir no Maps</a>
           </div>
         </div>
         <div class="observer-total" id="observerTotal"></div>
@@ -856,6 +951,12 @@
   let observerListRef = null;
   let observerMsgRef = null;
   let observerActiveUid = null;
+  let observerLocRef = null;
+  let observerLocTickTimer = null;
+  let lastObserverLoc = null;
+  let observerMapInstance = null;
+  let observerMapMarker = null;
+  let observerReceiptRef = null;
   let dataUsageBytes = 0;
   const DATA_BUDGET_BYTES = 200 * 1024 * 1024; // teto de segurança: 200 MB
   let lastFullSyncSignature = null; // evita reenviar a lista inteira sem necessidade
@@ -883,11 +984,27 @@
     return slugify(userName) + '-' + (deviceId || 'x');
   }
 
-  /* ---------- Contador de dados (baseado no tamanho real de cada payload enviado/recebido) ---------- */
+  /* ---------- Contador de dados ---------- */
   function byteSize(obj){
     try{ return new TextEncoder().encode(JSON.stringify(obj)).length; }
     catch(e){ return JSON.stringify(obj).length; }
   }
+  // O JSON puro do que sobe/desce não é tudo que passa na rede de verdade:
+  // o WebSocket do Firebase embrulha cada mensagem com cabeçalhos/framing
+  // próprios, então cada operação carrega uma sobrecarga a mais além do
+  // "conteúdo" em si. +30% é uma estimativa realista pra isso (medições
+  // públicas do protocolo do Firebase RTDB apontam nessa faixa), mais um
+  // valor fixo por mensagem (endereço do caminho no banco, cabeçalho da
+  // mensagem, etc.).
+  const WIRE_OVERHEAD_FACTOR = 1.3;
+  const WIRE_OVERHEAD_PER_MSG = 40;
+  function estimateWireBytes(payloadBytes){
+    return Math.ceil(Math.max(0,payloadBytes) * WIRE_OVERHEAD_FACTOR) + WIRE_OVERHEAD_PER_MSG;
+  }
+  // Handshake de conexão (TLS + autenticação do WebSocket do Firebase) só
+  // acontece uma vez quando liga o modo online, mas também é internet de
+  // verdade sendo usada — então contamos como uma estimativa fixa.
+  const CONNECTION_HANDSHAKE_BYTES = 6 * 1024;
   // Assinatura leve da lista local: usada só pra saber se algo mudou desde
   // o último envio completo, então precisa incluir TODO campo que pode
   // mudar depois de criado (hoje só "comprado" muda via toggle) — senão
@@ -909,7 +1026,7 @@
   }
   function updateDataUsageUI(){
     const el = $('dataUsageText');
-    if(el) el.textContent = '📶 ' + formatBytes(dataUsageBytes) + ' de 200 MB usados';
+    if(el) el.textContent = '📶 ~' + formatBytes(dataUsageBytes) + ' de 200 MB usados';
   }
   let dataUsageSaveTimer = null;
   async function trackData(bytes){
@@ -932,6 +1049,30 @@
     budgetEnforced = true;
     await setOnlineMode(false, { silent: true });
     showToast('Limite de 200 MB atingido. Modo online desligado pra proteger seus dados.');
+  }
+
+  // Antes, o contador só somava o JSON enviado/recebido do Firebase — mas
+  // baixar o SDK do Firebase e as fontes do Google (na primeira vez, ou
+  // sempre que a versão do cache muda) também é internet de verdade, e
+  // isso nunca era contado. Aqui a gente escuta o navegador informar o
+  // tamanho REAL (em bytes, na rede) de cada arquivo baixado — não é
+  // estimativa, é o número verdadeiro que o navegador mede. Não conta
+  // nada se o arquivo já veio do cache local (transferSize = 0 nesse caso).
+  function watchStaticAssetUsage(){
+    if(typeof PerformanceObserver === 'undefined') return;
+    try{
+      const seen = new Set();
+      const obs = new PerformanceObserver((list)=>{
+        list.getEntries().forEach(entry=>{
+          const key = entry.name + ':' + entry.startTime;
+          if(seen.has(key)) return;
+          seen.add(key);
+          const bytes = entry.transferSize || 0;
+          if(bytes > 0) trackData(bytes);
+        });
+      });
+      obs.observe({type:'resource', buffered:true});
+    }catch(e){ /* navegador sem suporte a essa API — segue sem esse detalhe */ }
   }
   $('resetDataUsageBtn').addEventListener('click', async ()=>{
     if(!confirm('Zerar o contador de dados usados?')) return;
@@ -984,9 +1125,14 @@
 
     if(isOn){
       firebase.database().goOnline();
+      trackData(CONNECTION_HANDSHAKE_BYTES);
       if(userName) await fullSyncToCloud();
+      if(locationSharing) startLocationSharing();
+      attachMainRecadoListener();
     }else{
       detachObserverListener();
+      detachMainRecadoListener();
+      stopLocationSharing();
       firebase.database().goOffline();
       if(!opts.silent) showToast('Modo offline: nenhuma internet é usada.');
     }
@@ -1008,7 +1154,7 @@
         const db = firebase.database();
         db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
         db.ref('usuarios/'+currentUid+'/online').set(true);
-        trackData(20);
+        trackData(estimateWireBytes(20));
       }catch(e){}
       return;
     }
@@ -1019,7 +1165,7 @@
       await db.ref('listas/'+currentUid+'/itens').set(itemsObj);
       db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
       db.ref('usuarios/'+currentUid+'/online').set(true);
-      trackData(byteSize(itemsObj) + byteSize(meta));
+      trackData(estimateWireBytes(byteSize(itemsObj) + byteSize(meta)));
       setLastFullSyncSignature(signature);
     }catch(e){ /* sem internet no momento — segue só local */ }
   }
@@ -1030,7 +1176,7 @@
     try{
       await firebase.database().ref('listas/'+currentUid+'/itens/'+item.id).set(item);
       await firebase.database().ref('usuarios/'+currentUid).update({ nome: userName, atualizadoEm: Date.now() });
-      trackData(byteSize(item) + 30);
+      trackData(estimateWireBytes(byteSize(item)));
       setLastFullSyncSignature(listSignature(items));
     }catch(e){}
   }
@@ -1039,39 +1185,316 @@
     currentUid = cloudUid();
     try{
       await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove();
-      trackData(30);
+      trackData(estimateWireBytes(0));
       setLastFullSyncSignature(listSignature(items));
     }catch(e){}
   }
   async function clearCloudList(){
     if(!onlineMode || !ensureFirebase() || !userName) return;
     currentUid = cloudUid();
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); setLastFullSyncSignature(''); }catch(e){}
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(estimateWireBytes(0)); setLastFullSyncSignature(''); }catch(e){}
   }
-  async function sendBroadcastMessage(){
-    const texto = $('broadcastInput').value.trim();
+  /* ---------- Rastreador de localização (atualiza a cada 30s) ----------
+     Antes usava getCurrentPosition() a cada 30s com maximumAge de 20s, o
+     que podia devolver uma posição em cache e "travar" o pontinho no mapa
+     enquanto a pessoa já tinha saído andando ou de carro. Agora o GPS fica
+     ligado o tempo todo com watchPosition() (o celular vai atualizando a
+     posição sozinho conforme anda), e a cada 30s a gente só pega a leitura
+     mais recente que o GPS já tem e manda pra nuvem — assim o carro sempre
+     aparece no lugar certo, sem ficar parado, mas sem gastar mais internet
+     do que um envio a cada 30s. */
+  let locationSharing = false;
+  let locationInterval = null;
+  let locationWatchId = null;
+  let lastKnownPosition = null;
+
+  function setLocationUI(isOn){
+    const btn = $('locToggleBtn');
+    if(!btn) return;
+    btn.classList.toggle('on', isOn);
+    btn.title = isOn ? 'Compartilhando localização (toque para parar)' : 'Compartilhar localização';
+  }
+
+  function pushLocationToCloud(pos){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    currentUid = cloudUid();
+    // velocidade vem em m/s do navegador → convertida pra km/h, mais fácil de ler.
+    // Dentro do mercado o GPS costuma achar que a velocidade é 0 ou nem informar,
+    // o que é esperado — o campo só importa mesmo quando a pessoa já está se
+    // deslocando (voltando de carro, por exemplo).
+    const velocidadeKmh = (typeof pos.coords.speed === 'number' && pos.coords.speed >= 0)
+      ? Math.round(pos.coords.speed * 3.6) : null;
+    const rumo = (typeof pos.coords.heading === 'number' && !isNaN(pos.coords.heading))
+      ? Math.round(pos.coords.heading) : null;
+    const loc = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      precisao: Math.round(pos.coords.accuracy || 0),
+      velocidade: velocidadeKmh,
+      rumo: rumo,
+      atualizadoEm: Date.now()
+    };
+    try{
+      firebase.database().ref('listas/'+currentUid+'/localizacao').set(loc);
+      trackData(estimateWireBytes(byteSize(loc)));
+    }catch(e){}
+  }
+
+  function sendLocationUpdate(){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    if(lastKnownPosition){
+      pushLocationToCloud(lastKnownPosition);
+      return;
+    }
+    // Ainda não recebemos nenhuma leitura do watchPosition (ex: acabou de
+    // ligar) — pede uma leitura avulsa só dessa vez pra não ficar 30s sem
+    // mandar nada.
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos)=>{
+      lastKnownPosition = pos;
+      pushLocationToCloud(pos);
+    }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+  }
+
+  function startLocationSharing(){
+    if(locationWatchId === null && navigator.geolocation){
+      // enableHighAccuracy:true usa GPS de verdade (não só rede/wifi) —
+      // importa bastante pra pegar direção e velocidade certas num carro
+      // em movimento. Dentro do mercado (parado, sem sinal de GPS limpo)
+      // ele simplesmente usa a última posição disponível, sem problema.
+      locationWatchId = navigator.geolocation.watchPosition((pos)=>{
+        lastKnownPosition = pos;
+      }, ()=>{ /* sem permissão ou sem sinal agora — tenta de novo sozinho */ },
+      { enableHighAccuracy:true, maximumAge:5000, timeout:20000 });
+    }
+    sendLocationUpdate();
+    if(locationInterval) clearInterval(locationInterval);
+    locationInterval = setInterval(sendLocationUpdate, 30000);
+  }
+  function stopLocationSharing(){
+    if(locationWatchId !== null && navigator.geolocation){
+      navigator.geolocation.clearWatch(locationWatchId);
+      locationWatchId = null;
+    }
+    if(locationInterval){ clearInterval(locationInterval); locationInterval = null; }
+    lastKnownPosition = null;
+  }
+
+  $('locToggleBtn').addEventListener('click', async ()=>{
+    if(!onlineMode){ showToast('Ative o modo online pra compartilhar sua localização.'); return; }
+    if(!navigator.geolocation){ showToast('Este aparelho não suporta localização.'); return; }
+    locationSharing = !locationSharing;
+    await storageSet('user:shareLocation', locationSharing ? '1' : '0');
+    setLocationUI(locationSharing);
+    if(locationSharing){
+      startLocationSharing();
+      showToast('Compartilhando sua localização a cada 30s.');
+    }else{
+      stopLocationSharing();
+      showToast('Localização não é mais compartilhada.');
+    }
+  });
+
+  async function sendBroadcastMessage(presetText){
+    // presetText vem dos botões de status rápido (Finalizar compra, Carrinho
+    // finalizado, Pedido Uber). Sem ele, usa o que a pessoa digitou no campo
+    // livre. Nenhum dos dois caminhos mexe na lista de itens — só avisa quem
+    // está observando, a lista continua aberta do jeito que estava.
+    const texto = presetText || $('broadcastInput').value.trim();
     if(!texto) return;
     if(!onlineMode || !ensureFirebase() || !userName){ showToast('Ative o modo online pra enviar.'); return; }
     currentUid = cloudUid();
     const msg = { texto: texto, criadoEm: Date.now() };
     try{
       await firebase.database().ref('listas/'+currentUid+'/mensagem').set(msg);
-      trackData(byteSize(msg));
+      trackData(estimateWireBytes(byteSize(msg)));
       showToast('Mensagem enviada para quem estiver observando!');
-      $('broadcastInput').value = '';
+      if(!presetText) $('broadcastInput').value = '';
     }catch(e){ showToast('Não foi possível enviar agora.'); }
   }
-  $('broadcastSendBtn').addEventListener('click', sendBroadcastMessage);
+  $('broadcastSendBtn').addEventListener('click', ()=> sendBroadcastMessage());
   $('broadcastInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') sendBroadcastMessage(); });
+  document.querySelectorAll('.quick-status-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      sendBroadcastMessage(btn.getAttribute('data-status'));
+      if(btn.id === 'statusFinalizarBtn') sendReceiptToCloud();
+    });
+  });
+
+  /* ---------- Recibo da compra (gerado localmente, sem servidor nem lib) ----------
+     Ao "Finalizar compra", desenha uma notinha num <canvas> (só com o que já
+     está na lista, sem precisar de internet pra montar) e manda como uma
+     imagem PNG pra quem estiver observando. PNG em vez de foto/JPEG porque
+     o conteúdo é só texto em fundo liso — cabe em poucos KB e fica nítido
+     pra ler, ao contrário de comprimir uma foto de verdade. */
+  function drawDashedLine(ctx, x1, x2, y){
+    ctx.save();
+    ctx.strokeStyle = '#D8CFAF';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function buildReceiptCanvas(){
+    const boughtItems = items.filter(i=>i.comprado);
+    const width = 360;
+    const padX = 20;
+    const rowH = 38;
+    const height = 78 + boughtItems.length * rowH + 74;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Fundo branco puro (não o bege do tema): poucas cores = PNG bem mais leve.
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#1B2B22';
+    ctx.textBaseline = 'top';
+
+    let y = 16;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 19px sans-serif';
+    ctx.fillText('Sacolinha', width/2, y);
+    y += 24;
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#6B7A6F';
+    const dataStr = new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+    ctx.fillText((userName ? userName + ' · ' : '') + dataStr, width/2, y);
+    y += 20;
+
+    drawDashedLine(ctx, padX, width-padX, y);
+    y += 12;
+
+    ctx.textAlign = 'left';
+    boughtItems.forEach(it=>{
+      let name = it.nome || '';
+      ctx.font = 'bold 13.5px sans-serif';
+      if(ctx.measureText(name).width > width - padX*2 - 10){
+        while(name.length > 1 && ctx.measureText(name+'…').width > width - padX*2 - 10) name = name.slice(0, -1);
+        name += '…';
+      }
+      ctx.fillStyle = '#1B2B22';
+      ctx.fillText(name, padX, y);
+      y += 17;
+
+      const qtyLabel = it.quantidade + ' ' + (UNIT_LABEL[it.unidade] || it.unidade);
+      const lineTotal = (parseFloat(it.preco)||0) * (parseFloat(it.quantidade)||0);
+      ctx.font = '11.5px sans-serif';
+      ctx.fillStyle = '#6B7A6F';
+      ctx.fillText(qtyLabel + (it.preco ? ('  ×  ' + formatBRL(it.preco)) : ''), padX, y);
+
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 12.5px sans-serif';
+      ctx.fillStyle = '#1B2B22';
+      ctx.fillText(it.preco ? formatBRL(lineTotal) : '—', width-padX, y);
+      ctx.textAlign = 'left';
+      y += 21;
+    });
+
+    drawDashedLine(ctx, padX, width-padX, y);
+    y += 14;
+
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('TOTAL', padX, y+2);
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 19px sans-serif';
+    ctx.fillText(formatBRL(listTotal(boughtItems)), width-padX, y);
+    ctx.textAlign = 'center';
+    y += 32;
+
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#8A9089';
+    ctx.fillText(boughtItems.length + (boughtItems.length === 1 ? ' item' : ' itens') + ' · gerado pelo app Sacolinha', width/2, y);
+
+    return canvas;
+  }
+
+  async function sendReceiptToCloud(){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    const boughtItems = items.filter(i=>i.comprado);
+    if(boughtItems.length === 0) return;
+    currentUid = cloudUid();
+    try{
+      const canvas = buildReceiptCanvas();
+      const imagem = canvas.toDataURL('image/png');
+      const recibo = { imagem: imagem, total: listTotal(boughtItems), itens: boughtItems.length, criadoEm: Date.now() };
+      await firebase.database().ref('listas/'+currentUid+'/recibo').set(recibo);
+      trackData(estimateWireBytes(byteSize(recibo)));
+    }catch(e){ /* sem internet no momento — a mensagem de status já foi tentada separadamente */ }
+  }
+
+  /* ---------- Recado do observador pro comprador (via mão contrária) ----------
+     A mensagem de cima (mensagem) vai de quem compra pra quem observa.
+     Esse aqui é o caminho inverso: quem está observando manda um recado, e
+     ele aparece na tela de quem está comprando, tipo uma resposta. */
+  let mainRecadoRef = null;
+
+  async function sendMessageToShopper(){
+    const texto = $('observerReplyInput').value.trim();
+    if(!texto) return;
+    if(!observerActiveUid || !ensureFirebase()){ showToast('Não foi possível enviar agora.'); return; }
+    const msg = { texto: texto, criadoEm: Date.now(), de: userName || 'quem está observando' };
+    try{
+      await firebase.database().ref('listas/'+observerActiveUid+'/mensagemObservador').set(msg);
+      trackData(estimateWireBytes(byteSize(msg)));
+      showToast('Recado enviado!');
+      $('observerReplyInput').value = '';
+    }catch(e){ showToast('Não foi possível enviar agora.'); }
+  }
+  $('observerReplySendBtn').addEventListener('click', sendMessageToShopper);
+  $('observerReplyInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') sendMessageToShopper(); });
+
+  function attachMainRecadoListener(){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    detachMainRecadoListener();
+    currentUid = cloudUid();
+    mainRecadoRef = firebase.database().ref('listas/'+currentUid+'/mensagemObservador');
+    mainRecadoRef.on('value', (snap)=>{
+      const data = snap.val();
+      trackData(estimateWireBytes(byteSize(data || {})));
+      renderMainRecado(data);
+    });
+  }
+  function detachMainRecadoListener(){
+    if(mainRecadoRef){ mainRecadoRef.off(); mainRecadoRef = null; }
+  }
+  function renderMainRecado(data){
+    const box = $('mainRecadoBox');
+    if(!data || !data.texto){ box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    $('mainRecadoText').textContent = data.texto;
+    const when = data.criadoEm ? new Date(data.criadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+    $('mainRecadoWhen').textContent = (data.de ? ('de ' + data.de) : '') + (when ? (' · enviado às ' + when) : '');
+  }
 
   /* ---------- Tela do observador ---------- */
   function detachObserverListener(){
     if(observerListRef) observerListRef.off();
     if(observerMsgRef) observerMsgRef.off();
+    if(observerLocRef) observerLocRef.off();
+    if(observerReceiptRef) observerReceiptRef.off();
     observerListRef = null;
     observerMsgRef = null;
+    observerLocRef = null;
+    observerReceiptRef = null;
     observerActiveUid = null;
     observerItemsCache = {};
+    if(observerLocTickTimer){ clearInterval(observerLocTickTimer); observerLocTickTimer = null; }
+    destroyObserverMap();
+  }
+
+  function destroyObserverMap(){
+    if(observerMapInstance){
+      try{ observerMapInstance.remove(); }catch(e){}
+      observerMapInstance = null;
+      observerMapMarker = null;
+    }
   }
 
   $('openObserverBtn').addEventListener('click', openObserverScreen);
@@ -1109,7 +1532,7 @@
     try{
       const snap = await firebase.database().ref('usuarios').once('value');
       const data = snap.val() || {};
-      trackData(byteSize(data));
+      trackData(estimateWireBytes(byteSize(data)));
       const myUid = cloudUid();
       const others = Object.entries(data).filter(([uid]) => uid !== myUid);
       $('userPickEmpty').classList.toggle('hidden', others.length > 0);
@@ -1147,18 +1570,18 @@
     // dados crescer sem parar conforme a lista de itens aumenta.
     observerListRef.on('child_added', (snap)=>{
       const item = snap.val();
-      trackData(byteSize(item));
+      trackData(estimateWireBytes(byteSize(item)));
       observerItemsCache[snap.key] = item;
       renderObserverItems(Object.values(observerItemsCache));
     });
     observerListRef.on('child_changed', (snap)=>{
       const item = snap.val();
-      trackData(byteSize(item));
+      trackData(estimateWireBytes(byteSize(item)));
       observerItemsCache[snap.key] = item;
       renderObserverItems(Object.values(observerItemsCache));
     });
     observerListRef.on('child_removed', (snap)=>{
-      trackData(30);
+      trackData(estimateWireBytes(0));
       delete observerItemsCache[snap.key];
       renderObserverItems(Object.values(observerItemsCache));
     });
@@ -1166,9 +1589,105 @@
     observerMsgRef = firebase.database().ref('listas/'+uid+'/mensagem');
     observerMsgRef.on('value', (snap)=>{
       const data = snap.val();
-      trackData(byteSize(data || {}));
+      trackData(estimateWireBytes(byteSize(data || {})));
       renderObserverMessage(data);
     });
+
+    $('observerReceiptBox').classList.add('hidden');
+    observerReceiptRef = firebase.database().ref('listas/'+uid+'/recibo');
+    observerReceiptRef.on('value', (snap)=>{
+      const data = snap.val();
+      trackData(estimateWireBytes(byteSize(data || {})));
+      renderObserverReceipt(data);
+    });
+
+    $('observerLocationBox').classList.add('hidden');
+    lastObserverLoc = null;
+    observerLocRef = firebase.database().ref('listas/'+uid+'/localizacao');
+    observerLocRef.on('value', (snap)=>{
+      const data = snap.val();
+      trackData(estimateWireBytes(byteSize(data || {})));
+      lastObserverLoc = data || null;
+      renderObserverLocation(lastObserverLoc);
+    });
+    if(observerLocTickTimer) clearInterval(observerLocTickTimer);
+    // Reatualiza só o texto de "há quantos segundos" a cada 5s, sem precisar
+    // de dado novo vindo da rede — é só o relógio local passando o tempo.
+    observerLocTickTimer = setInterval(()=> renderObserverLocation(lastObserverLoc), 5000);
+  }
+
+  function timeAgoLabel(ts){
+    const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if(diff < 60) return 'atualizado há ' + diff + 's';
+    const min = Math.floor(diff / 60);
+    if(min < 60) return 'atualizado há ' + min + ' min';
+    const h = Math.floor(min / 60);
+    return 'atualizado há ' + h + 'h';
+  }
+
+  // Enquanto a pessoa está parada (ou o GPS não informa velocidade — comum
+  // dentro do mercado), mostra um pino simples. Assim que detecta
+  // movimento (ex: voltando de carro), troca pro carrinho apontando pra
+  // direção certa, igual um app de corrida mostraria.
+  const MOVING_THRESHOLD_KMH = 3;
+  function locationMarkerHtml(rumo, velocidade){
+    const isMoving = typeof velocidade === 'number' && velocidade > MOVING_THRESHOLD_KMH;
+    if(!isMoving){
+      return '<div style="font-size:26px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));">📍</div>';
+    }
+    const rotation = typeof rumo === 'number' ? rumo : 0;
+    return '<div style="font-size:24px; line-height:1; transform:rotate('+rotation+'deg); transform-origin:50% 50%; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));">🚗</div>';
+  }
+
+  function ensureObserverMap(){
+    if(observerMapInstance) return observerMapInstance;
+    if(typeof L === 'undefined') return null; // Leaflet não carregou (ex: sem internet agora) — segue sem o mapa embutido
+    try{
+      observerMapInstance = L.map('observerMap', {
+        zoomControl:false, attributionControl:false, scrollWheelZoom:false
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(observerMapInstance);
+    }catch(e){ observerMapInstance = null; }
+    return observerMapInstance;
+  }
+
+  function renderObserverLocation(data){
+    const box = $('observerLocationBox');
+    if(!data || typeof data.lat !== 'number' || typeof data.lng !== 'number'){
+      box.classList.add('hidden');
+      return;
+    }
+    const when = data.atualizadoEm ? timeAgoLabel(data.atualizadoEm) : '';
+    const isMoving = typeof data.velocidade === 'number' && data.velocidade > MOVING_THRESHOLD_KMH;
+    const speedTxt = isMoving ? (' · ' + data.velocidade + ' km/h') : '';
+    $('observerLocationEmoji').textContent = isMoving ? '🚗' : '📍';
+    $('observerLocationSpeed').textContent = (isMoving ? 'Em movimento' : 'Localização compartilhada') + speedTxt;
+    $('observerLocationWhen').textContent = when;
+    $('observerLocationLink').href = 'https://www.google.com/maps?q=' + data.lat + ',' + data.lng;
+    box.classList.remove('hidden');
+
+    const latlng = [data.lat, data.lng];
+    const map = ensureObserverMap();
+    const mapEl = $('observerMap');
+    if(!map){ mapEl.classList.add('hidden'); return; }
+    mapEl.classList.remove('hidden');
+    // Toda vez que a caixa fica escondida (ex: saiu do modo observador) e
+    // volta a aparecer, o Leaflet perde a noção do tamanho real do
+    // container — sem isso o mapa aparece cinza ou cortado.
+    setTimeout(()=> map.invalidateSize(), 0);
+
+    const icon = L.divIcon({ className:'', html: locationMarkerHtml(data.rumo, data.velocidade), iconSize:[30,30], iconAnchor:[15,15] });
+    if(!observerMapMarker){
+      observerMapMarker = L.marker(latlng, { icon }).addTo(map);
+      map.setView(latlng, 16);
+    }else{
+      observerMapMarker.setIcon(icon);
+      observerMapMarker.setLatLng(latlng);
+      // panTo em vez de setView: desliza suavemente até o ponto novo, em
+      // vez de "pular" — fica com aparência de rastreamento ao vivo, não
+      // de foto parada sendo trocada.
+      map.panTo(latlng, { animate:true, duration:0.8 });
+    }
   }
 
   function renderObserverMessage(data){
@@ -1178,6 +1697,16 @@
     $('observerMessageText').textContent = data.texto;
     const when = data.criadoEm ? new Date(data.criadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
     $('observerMessageWhen').textContent = when ? ('enviado às ' + when) : '';
+  }
+
+  function renderObserverReceipt(data){
+    const box = $('observerReceiptBox');
+    if(!data || !data.imagem){ box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    $('observerReceiptImg').src = data.imagem;
+    $('observerReceiptLink').href = data.imagem;
+    const when = data.criadoEm ? new Date(data.criadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+    $('observerReceiptWhen').textContent = when ? ('gerado às ' + when + ' · toque pra ampliar') : 'toque pra ampliar';
   }
 
   function renderObserverItems(list){
@@ -1226,9 +1755,14 @@
     onlineMode = savedOnline === '1';
     setOnlineUI(onlineMode);
 
+    const savedLoc = await storageGet('user:shareLocation');
+    locationSharing = savedLoc === '1';
+    setLocationUI(locationSharing);
+
     const savedUsage = await storageGet('data:usageBytes');
     dataUsageBytes = parseInt(savedUsage, 10) || 0;
     updateDataUsageUI();
+    watchStaticAssetUsage();
 
     const name = await storageGet('user:name');
     if(name){
@@ -1260,7 +1794,7 @@
       try{ items = raw ? JSON.parse(raw) : []; }catch(e){ items = []; }
     }
     enterApp();
-    if(onlineMode) fullSyncToCloud();
+    if(onlineMode){ fullSyncToCloud(); if(locationSharing) startLocationSharing(); }
   });
   $('nameInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') $('startBtn').click(); });
 
@@ -1444,6 +1978,7 @@
       ? 'Quem estiver te observando vê essa mensagem na hora.'
       : 'Só funciona com o modo online ligado 🌐.';
     $('broadcastSendBtn').disabled = !onlineMode;
+    document.querySelectorAll('.quick-status-btn').forEach(btn=> btn.disabled = !onlineMode);
 
     if(total > 0 && done === total && !celebrated){
       celebrated = true;
