@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sacolinha-cache-v2';
+const CACHE_NAME = 'sacolinha-cache-v7';
 
 // Arquivos do próprio app: quase nunca mudam de conteúdo sem trocar de
 // versão (o update-checker.js avisa quando sai uma versão nova), então
