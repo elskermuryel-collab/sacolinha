@@ -43,6 +43,14 @@
   }
 
   function checkForUpdate() {
+    // Não checa de novo se já checou há pouco tempo (evita gastar internet
+    // e sinal do mercado quando a pessoa reabre o app várias vezes seguidas).
+    var THROTTLE_MS = 30 * 60 * 1000; // 30 minutos
+    var lastCheck = 0;
+    try { lastCheck = parseInt(localStorage.getItem('update_last_check') || '0', 10); } catch (e) {}
+    if (Date.now() - lastCheck < THROTTLE_MS) return;
+    try { localStorage.setItem('update_last_check', String(Date.now())); } catch (e) {}
+
     fetch("version.txt", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.text() : null; })
       .then(function (localVersion) {

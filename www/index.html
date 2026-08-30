@@ -857,16 +857,44 @@
   let observerMsgRef = null;
   let observerActiveUid = null;
   let dataUsageBytes = 0;
+  const DATA_BUDGET_BYTES = 200 * 1024 * 1024; // teto de segurança: 200 MB
+  let lastFullSyncSignature = null; // evita reenviar a lista inteira sem necessidade
+  let observerItemsCache = {}; // cache local dos itens observados (p/ listeners incrementais)
+  let deviceId = null; // sufixo único deste aparelho, pra não colidir com outra pessoa de mesmo nome
+  let budgetEnforced = false; // evita disparar o corte de 200MB várias vezes seguidas
 
   function slugify(str){
     return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'usuario';
   }
 
+  // Duas pessoas podem ter o mesmo nome (ex: duas "Maria"). Sem um sufixo
+  // único por aparelho, as duas cairiam no MESMO endereço na nuvem e uma
+  // lista sobrescreveria a outra. Esse ID é gerado uma vez e guardado.
+  async function getOrCreateDeviceId(){
+    let id = await storageGet('device:id');
+    if(!id){
+      id = Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2,6);
+      await storageSet('device:id', id);
+    }
+    return id;
+  }
+  function cloudUid(){
+    return slugify(userName) + '-' + (deviceId || 'x');
+  }
+
   /* ---------- Contador de dados (baseado no tamanho real de cada payload enviado/recebido) ---------- */
   function byteSize(obj){
     try{ return new TextEncoder().encode(JSON.stringify(obj)).length; }
     catch(e){ return JSON.stringify(obj).length; }
+  }
+  // Assinatura leve da lista local: usada só pra saber se algo mudou desde
+  // o último envio completo, então precisa incluir TODO campo que pode
+  // mudar depois de criado (hoje só "comprado" muda via toggle) — senão
+  // uma alteração feita offline pode nunca chegar na nuvem quando a
+  // pessoa volta a ficar online.
+  function listSignature(list){
+    return list.map(it => it.id + ':' + (it.criadoEm||0) + ':' + (it.comprado ? 1 : 0)).join('|');
   }
   function formatBytes(n){
     n = n || 0;
@@ -877,15 +905,33 @@
   }
   function updateDataUsageUI(){
     const el = $('dataUsageText');
-    if(el) el.textContent = '📶 ' + formatBytes(dataUsageBytes) + ' usados';
+    if(el) el.textContent = '📶 ' + formatBytes(dataUsageBytes) + ' de 200 MB usados';
   }
+  let dataUsageSaveTimer = null;
   async function trackData(bytes){
     dataUsageBytes += Math.max(0, bytes|0);
-    await storageSet('data:usageBytes', String(dataUsageBytes));
     updateDataUsageUI();
+    // Salva com um pequeno atraso: numa rajada de eventos (ex: carregar
+    // 200 itens de uma vez), várias gravações concorrentes podiam
+    // terminar fora de ordem e deixar salvo um número mais baixo que o
+    // real. Assim só a última gravação (com o valor mais atual) conta.
+    clearTimeout(dataUsageSaveTimer);
+    dataUsageSaveTimer = setTimeout(()=>{
+      storageSet('data:usageBytes', String(dataUsageBytes));
+    }, 400);
+    if(dataUsageBytes >= DATA_BUDGET_BYTES){
+      await enforceDataBudget();
+    }
+  }
+  async function enforceDataBudget(){
+    if(!onlineMode || budgetEnforced) return;
+    budgetEnforced = true;
+    await setOnlineMode(false, { silent: true });
+    showToast('Limite de 200 MB atingido. Modo online desligado pra proteger seus dados.');
   }
   $('resetDataUsageBtn').addEventListener('click', async ()=>{
     if(!confirm('Zerar o contador de dados usados?')) return;
+    clearTimeout(dataUsageSaveTimer);
     dataUsageBytes = 0;
     await storageSet('data:usageBytes', '0');
     updateDataUsageUI();
@@ -909,15 +955,28 @@
 
   async function setOnlineMode(isOn, opts){
     opts = opts || {};
+
+    if(isOn && !ensureFirebase()){
+      // Não dá pra ficar "online" de verdade sem o Firebase carregado
+      // (ex: sem internet no momento). Antes o app deixava o indicador
+      // travado em "online" mesmo sem sincronizar nada, silenciosamente.
+      // Agora ele volta pro offline de verdade e avisa (a não ser que
+      // seja a checagem silenciosa de abertura do app).
+      onlineMode = false;
+      await storageSet('user:onlineMode', '0');
+      setOnlineUI(false);
+      if(userName) render();
+      if(!opts.silent) showToast('Sem conexão pra ativar o modo online agora.');
+      return;
+    }
+
     onlineMode = isOn;
+    budgetEnforced = false;
     await storageSet('user:onlineMode', isOn ? '1' : '0');
     setOnlineUI(isOn);
     if(userName) render();
 
-    if(!ensureFirebase()){
-      if(isOn && !opts.silent) showToast('Sincronização não configurada ainda neste app.');
-      return;
-    }
+    if(!ensureFirebase()) return;
 
     if(isOn){
       firebase.database().goOnline();
@@ -929,11 +988,26 @@
     }
   }
 
-  async function fullSyncToCloud(){
+  async function fullSyncToCloud(force){
     if(!onlineMode || !ensureFirebase() || !userName) return;
-    currentUid = slugify(userName);
+    currentUid = cloudUid();
     const itemsObj = {};
     items.forEach(it => itemsObj[it.id] = it);
+    // Assinatura leve (ids + horário de criação) só pra saber se a lista mudou
+    // desde o último envio completo. Se não mudou, não reenviamos tudo de novo
+    // (ex: quando o app liga/desliga o modo online várias vezes no mercado
+    // por causa de sinal fraco).
+    const signature = listSignature(items);
+    if(!force && signature === lastFullSyncSignature){
+      // só garante que o status "online" fique atualizado, sem reenviar a lista
+      try{
+        const db = firebase.database();
+        db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
+        db.ref('usuarios/'+currentUid+'/online').set(true);
+        trackData(20);
+      }catch(e){}
+      return;
+    }
     try{
       const db = firebase.database();
       const meta = { nome: userName, atualizadoEm: Date.now() };
@@ -942,33 +1016,39 @@
       db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
       db.ref('usuarios/'+currentUid+'/online').set(true);
       trackData(byteSize(itemsObj) + byteSize(meta));
+      lastFullSyncSignature = signature;
     }catch(e){ /* sem internet no momento — segue só local */ }
   }
 
   async function syncItemToCloud(item){
     if(!onlineMode || !ensureFirebase() || !userName) return;
-    currentUid = slugify(userName);
+    currentUid = cloudUid();
     try{
       await firebase.database().ref('listas/'+currentUid+'/itens/'+item.id).set(item);
       await firebase.database().ref('usuarios/'+currentUid).update({ nome: userName, atualizadoEm: Date.now() });
       trackData(byteSize(item) + 30);
+      lastFullSyncSignature = listSignature(items);
     }catch(e){}
   }
   async function removeItemFromCloud(id){
     if(!onlineMode || !ensureFirebase() || !userName) return;
-    currentUid = slugify(userName);
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove(); trackData(30); }catch(e){}
+    currentUid = cloudUid();
+    try{
+      await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove();
+      trackData(30);
+      lastFullSyncSignature = listSignature(items);
+    }catch(e){}
   }
   async function clearCloudList(){
     if(!onlineMode || !ensureFirebase() || !userName) return;
-    currentUid = slugify(userName);
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); }catch(e){}
+    currentUid = cloudUid();
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); lastFullSyncSignature = ''; }catch(e){}
   }
   async function sendBroadcastMessage(){
     const texto = $('broadcastInput').value.trim();
     if(!texto) return;
     if(!onlineMode || !ensureFirebase() || !userName){ showToast('Ative o modo online pra enviar.'); return; }
-    currentUid = slugify(userName);
+    currentUid = cloudUid();
     const msg = { texto: texto, criadoEm: Date.now() };
     try{
       await firebase.database().ref('listas/'+currentUid+'/mensagem').set(msg);
@@ -987,6 +1067,7 @@
     observerListRef = null;
     observerMsgRef = null;
     observerActiveUid = null;
+    observerItemsCache = {};
   }
 
   $('openObserverBtn').addEventListener('click', openObserverScreen);
@@ -1025,7 +1106,7 @@
       const snap = await firebase.database().ref('usuarios').once('value');
       const data = snap.val() || {};
       trackData(byteSize(data));
-      const myUid = slugify(userName || '');
+      const myUid = cloudUid();
       const others = Object.entries(data).filter(([uid]) => uid !== myUid);
       $('userPickEmpty').classList.toggle('hidden', others.length > 0);
       others.forEach(([uid, info])=>{
@@ -1054,11 +1135,28 @@
     $('observerLiveName').textContent = nome;
     $('observerMessageBox').classList.add('hidden');
 
+    observerItemsCache = {};
     observerListRef = firebase.database().ref('listas/'+uid+'/itens');
-    observerListRef.on('value', (snap)=>{
-      const data = snap.val() || {};
-      trackData(byteSize(data));
-      renderObserverItems(Object.values(data));
+    // Usamos listeners incrementais (child_added/changed/removed) em vez de
+    // 'value': assim o Firebase manda só o item que mudou, não a lista
+    // inteira de novo a cada alteração. Isso é o que evita o consumo de
+    // dados crescer sem parar conforme a lista de itens aumenta.
+    observerListRef.on('child_added', (snap)=>{
+      const item = snap.val();
+      trackData(byteSize(item));
+      observerItemsCache[snap.key] = item;
+      renderObserverItems(Object.values(observerItemsCache));
+    });
+    observerListRef.on('child_changed', (snap)=>{
+      const item = snap.val();
+      trackData(byteSize(item));
+      observerItemsCache[snap.key] = item;
+      renderObserverItems(Object.values(observerItemsCache));
+    });
+    observerListRef.on('child_removed', (snap)=>{
+      trackData(30);
+      delete observerItemsCache[snap.key];
+      renderObserverItems(Object.values(observerItemsCache));
     });
 
     observerMsgRef = firebase.database().ref('listas/'+uid+'/mensagem');
@@ -1108,6 +1206,8 @@
   }
 
   async function init(){
+    deviceId = await getOrCreateDeviceId();
+
     const savedTheme = await storageGet('user:theme');
     applyTheme(savedTheme || 'light', false);
 
@@ -1220,13 +1320,17 @@
       const img = new Image();
       img.onload = function(){
         const canvas = document.createElement('canvas');
-        const MAX = 200;
+        // A foto aparece no máximo a 58x58px na tela (preview do modal) e
+        // 46x46px na lista (.item-card .thumb). 150px já cobre até telas de
+        // altíssima densidade (~2.5x) com folga, então não faz sentido
+        // guardar/enviar imagens maiores que isso.
+        const MAX = 150;
         let w = img.width, h = img.height;
         if(w > h){ if(w > MAX){ h = h*(MAX/w); w = MAX; } }
         else{ if(h > MAX){ w = w*(MAX/h); h = MAX; } }
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        selectedPhoto = canvas.toDataURL('image/jpeg', 0.7);
+        selectedPhoto = canvas.toDataURL('image/jpeg', 0.6);
         $('photoPreviewImg').src = selectedPhoto;
         $('photoPreview').classList.remove('hidden');
         $('photoInputWrap').classList.add('hidden');
