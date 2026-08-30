@@ -896,6 +896,10 @@
   function listSignature(list){
     return list.map(it => it.id + ':' + (it.criadoEm||0) + ':' + (it.comprado ? 1 : 0)).join('|');
   }
+  function setLastFullSyncSignature(sig){
+    lastFullSyncSignature = sig;
+    storageSet('data:lastFullSyncSignature', sig);
+  }
   function formatBytes(n){
     n = n || 0;
     if(n < 1024) return n + ' B';
@@ -1016,7 +1020,7 @@
       db.ref('usuarios/'+currentUid+'/online').onDisconnect().set(false);
       db.ref('usuarios/'+currentUid+'/online').set(true);
       trackData(byteSize(itemsObj) + byteSize(meta));
-      lastFullSyncSignature = signature;
+      setLastFullSyncSignature(signature);
     }catch(e){ /* sem internet no momento — segue só local */ }
   }
 
@@ -1027,7 +1031,7 @@
       await firebase.database().ref('listas/'+currentUid+'/itens/'+item.id).set(item);
       await firebase.database().ref('usuarios/'+currentUid).update({ nome: userName, atualizadoEm: Date.now() });
       trackData(byteSize(item) + 30);
-      lastFullSyncSignature = listSignature(items);
+      setLastFullSyncSignature(listSignature(items));
     }catch(e){}
   }
   async function removeItemFromCloud(id){
@@ -1036,13 +1040,13 @@
     try{
       await firebase.database().ref('listas/'+currentUid+'/itens/'+id).remove();
       trackData(30);
-      lastFullSyncSignature = listSignature(items);
+      setLastFullSyncSignature(listSignature(items));
     }catch(e){}
   }
   async function clearCloudList(){
     if(!onlineMode || !ensureFirebase() || !userName) return;
     currentUid = cloudUid();
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); lastFullSyncSignature = ''; }catch(e){}
+    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(30); setLastFullSyncSignature(''); }catch(e){}
   }
   async function sendBroadcastMessage(){
     const texto = $('broadcastInput').value.trim();
@@ -1207,6 +1211,13 @@
 
   async function init(){
     deviceId = await getOrCreateDeviceId();
+
+    // Sem persistir isso, toda vez que o app reabria (com modo online
+    // ligado) ele "esquecia" que já tinha sincronizado a lista antes e
+    // mandava TUDO de novo (todas as fotos incluídas) achando que nada
+    // tinha sido confirmado ainda. Isso inflava o contador de dados de
+    // forma completamente irreal.
+    lastFullSyncSignature = await storageGet('data:lastFullSyncSignature');
 
     const savedTheme = await storageGet('user:theme');
     applyTheme(savedTheme || 'light', false);
