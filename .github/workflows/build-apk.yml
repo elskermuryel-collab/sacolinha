@@ -33,12 +33,33 @@ jobs:
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/filesystem @capacitor/file-transfer @capawesome-team/capacitor-file-opener
 
       - name: Inicializar e Sincronizar Projeto Android
         run: |
           npx cap init "Sacolinha App" "com.bramu.sacolinha" --web-dir www
           npx cap add android
           npx cap sync android
+
+      - name: Habilitar download + instalação automática da atualização
+        run: |
+          # Permissão que deixa o app pedir pra instalar o APK baixado sem
+          # precisar passar pela tela extra de "permitir fontes desconhecidas".
+          sed -i '/android.permission.INTERNET/a\    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' android/app/src/main/AndroidManifest.xml
+
+          # Arquivo exigido pelo plugin de abrir/instalar arquivo (FileProvider),
+          # que informa quais pastas do app podem ser compartilhadas com o
+          # instalador de pacotes do Android.
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="cache" path="." />
+              <files-path name="files" path="." />
+              <external-files-path name="external-files" path="." />
+              <external-cache-path name="external-cache" path="." />
+          </paths>
+          EOF
 
       - name: Aplicar ícone do app (usa resources/icon.png, icon-foreground.png e icon-background.png)
         run: |
