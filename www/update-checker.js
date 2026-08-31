@@ -52,25 +52,27 @@
     var overlay = document.createElement("div");
     overlay.id = "update-popup-overlay";
     overlay.style.cssText =
-      "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);" +
-      "display:flex;align-items:center;justify-content:center;padding:20px;" +
-      "font-family:sans-serif;";
+      "position:fixed;inset:0;z-index:99999;background:rgba(10,15,12,.6);" +
+      "display:flex;align-items:center;justify-content:center;padding:22px;" +
+      "font-family:'Manrope',system-ui,sans-serif;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);";
 
+    // Mesma linguagem visual do app (bege/verde/dourado, cantos macios),
+    // em vez do azul genérico que não combinava com nada.
     overlay.innerHTML =
-      '<div style="background:#fff;border-radius:14px;max-width:340px;width:100%;' +
-      'padding:22px 20px;box-shadow:0 10px 30px rgba(0,0,0,.3);text-align:center;">' +
-        '<div style="font-size:34px;margin-bottom:8px;">🔄</div>' +
-        '<div style="font-size:17px;font-weight:bold;color:#1F4436;margin-bottom:8px;">' +
-          'Atualização disponível!' +
+      '<div style="background:#FFFFFF;border:1px solid #E2D9BE;border-radius:20px;max-width:340px;' +
+      'width:100%;padding:24px 22px 20px;box-shadow:0 20px 50px rgba(27,43,34,.3);text-align:center;">' +
+        '<div style="font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:700;' +
+        'color:#1F4436;margin-bottom:8px;">Tem versão nova</div>' +
+        '<div id="update-popup-msg" style="font-size:14px;color:#5B6B60;margin-bottom:22px;line-height:1.5;">' +
+          'Uma Sacolinha atualizada acabou de sair. Quer instalar agora?' +
         '</div>' +
-        '<div id="update-popup-msg" style="font-size:14px;color:#444;margin-bottom:18px;line-height:1.4;">' +
-          'Tem uma versão nova do Sacolinha. Quer atualizar agora?' +
-        '</div>' +
-        '<div style="display:flex;gap:10px;">' +
-          '<button id="update-popup-nao" style="flex:1;background:#eee;color:#333;border:none;' +
-          'border-radius:8px;padding:12px 10px;font-weight:bold;font-size:14px;">Agora não</button>' +
-          '<button id="update-popup-sim" style="flex:1;background:#2563eb;color:#fff;border:none;' +
-          'border-radius:8px;padding:12px 10px;font-weight:bold;font-size:14px;">Sim, atualizar</button>' +
+        '<div id="update-popup-botoes" style="display:flex;gap:10px;">' +
+          '<button id="update-popup-nao" style="flex:1;background:transparent;color:#1F4436;' +
+          'border:1.5px solid #1F4436;border-radius:14px;padding:13px 10px;font-weight:800;' +
+          'font-size:14px;font-family:inherit;">Agora não</button>' +
+          '<button id="update-popup-sim" style="flex:1;background:linear-gradient(145deg,#E3A72B,#B9821A);' +
+          'color:#3A2A05;border:none;border-radius:14px;padding:13px 10px;font-weight:800;' +
+          'font-size:14px;font-family:inherit;">Atualizar</button>' +
         '</div>' +
       '</div>';
 
@@ -80,7 +82,7 @@
       marcarBaixando();
 
       var msg = document.getElementById("update-popup-msg");
-      var botoes = overlay.querySelector("div > div:last-child");
+      var botoes = document.getElementById("update-popup-botoes");
       if (botoes) botoes.remove();
       if (msg) {
         msg.innerHTML = 'Baixando a atualização... ⬇️';
@@ -155,6 +157,14 @@
     }
   }
 
+  // Compara versões: números viram número ("9" < "10"), qualquer outro
+  // formato cai na comparação de texto mesmo.
+  function ehMaisNova(remota, local) {
+    var r = parseFloat(remota), l = parseFloat(local);
+    if (!isNaN(r) && !isNaN(l) && String(r) === remota.trim() && String(l) === local.trim()) return r > l;
+    return remota !== local;
+  }
+
   function checkForUpdate(forcar) {
     var lastCheck = 0;
     try { lastCheck = parseInt(sessionStorage.getItem('update_last_check') || '0', 10); } catch (e) {}
@@ -173,7 +183,10 @@
             if (!remoteVersion) return;
             remoteVersion = remoteVersion.trim();
 
-            if (remoteVersion !== localVersion) {
+            // Só avisa quando a versão publicada é MAIS NOVA que a instalada.
+            // Comparando por "diferente", uma versão de teste mais adiantada
+            // que a do GitHub ficava pedindo "atualização" pra sempre.
+            if (ehMaisNova(remoteVersion, localVersion)) {
               mostrarPopup(remoteVersion);
             }
           })

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sacolinha-cache-v7';
+const CACHE_NAME = 'sacolinha-cache-v8';
 
 // Arquivos do próprio app: quase nunca mudam de conteúdo sem trocar de
 // versão (o update-checker.js avisa quando sai uma versão nova), então
@@ -7,6 +7,7 @@ const APP_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './update-checker.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png'
@@ -35,7 +36,7 @@ self.addEventListener('activate', (event) => {
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
