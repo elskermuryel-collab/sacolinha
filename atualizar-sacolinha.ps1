@@ -132,20 +132,26 @@ Write-Host ""
 # ---- 3) Confirma a atualizacao no GitHub (commit + push) ----
 Set-Location $destino
 
-# Puxa primeiro qualquer mudanca que o GitHub Actions tenha mandado de volta
+# Primeiro guarda (commit) o que mudou localmente. Isso precisa vir ANTES do
+# pull, porque o git recusa fazer rebase com mudancas soltas na arvore.
+git add -A
+
+$temMudancaLocal = git status --porcelain
+if (-not [string]::IsNullOrWhiteSpace($temMudancaLocal)) {
+    $dataHora = Get-Date -Format "dd/MM/yyyy HH:mm"
+    git commit -m "Atualizacao automatica - $dataHora" | Out-Null
+}
+
+# Agora puxa qualquer mudanca que o GitHub Actions tenha mandado de volta
 # (o build grava o numero da versao no version.txt e da commit sozinho).
 # Sem isso, o push seguinte pode ser rejeitado com "fetch first".
 git fetch origin main --quiet
 git pull origin main --rebase --quiet
 
-git add -A
-
-$temMudanca = git status --porcelain
+$temMudanca = git log origin/main..HEAD --oneline
 if ([string]::IsNullOrWhiteSpace($temMudanca)) {
     Write-Host "Nenhum arquivo mudou -- nada novo pra mandar pro GitHub."
 } else {
-    $dataHora = Get-Date -Format "dd/MM/yyyy HH:mm"
-    git commit -m "Atualizacao automatica - $dataHora"
     git push origin main
     $sha = (git rev-parse HEAD).Trim()
 
