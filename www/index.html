@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sacolinha">
+<meta name="app-version" content="17">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1833,6 +1834,69 @@
     }catch(e){ showToast('Erro ao salvar.'); return null; }
   }
 
+  /* ---------- RASCUNHO DO ITEM ----------
+     O rascunho fica no aparelho e é salvo a cada alteração. Assim uma
+     atualização da página não apaga o que estava sendo digitado.
+  */
+  const ITEM_DRAFT_KEY = 'shopping:itemDraft';
+
+  function draftHasContent(draft){
+    return !!(draft && (draft.nome || draft.quantidade !== '1' || draft.unidade !== 'un' ||
+      draft.preco || draft.observacao || draft.foto || draft.categoria !== 'mercearia'));
+  }
+
+  function saveItemDraft(){
+    if(!modalOverlay || !modalOverlay.classList.contains('open')) return;
+    const draft = {
+      nome: $('itemName').value,
+      quantidade: $('itemQty').value,
+      unidade: $('itemUnit').value,
+      preco: $('itemPrice').value,
+      observacao: $('itemObs').value,
+      categoria: selectedCategory,
+      foto: selectedPhoto,
+      salvoEm: Date.now()
+    };
+    try{
+      if(draftHasContent(draft)) localStorage.setItem(ITEM_DRAFT_KEY, JSON.stringify(draft));
+      else localStorage.removeItem(ITEM_DRAFT_KEY);
+    }catch(e){}
+  }
+
+  async function restoreItemDraft(){
+    let raw = null;
+    try{ raw = localStorage.getItem(ITEM_DRAFT_KEY); }catch(e){}
+    if(!raw) raw = await storageGet(ITEM_DRAFT_KEY);
+    if(!raw) return;
+    try{
+      const draft = JSON.parse(raw);
+      if(!draft || (draft.salvoEm && Date.now() - draft.salvoEm > 30*24*60*60*1000)) return;
+      $('itemName').value = draft.nome || '';
+      $('itemQty').value = draft.quantidade || '1';
+      $('itemUnit').value = draft.unidade || 'un';
+      $('itemPrice').value = draft.preco || '';
+      $('itemObs').value = draft.observacao || '';
+      selectedCategory = draft.categoria || 'mercearia';
+      selectedPhoto = draft.foto || null;
+      if(selectedPhoto){
+        $('photoPreviewImg').src = selectedPhoto;
+        $('photoPreview').classList.remove('hidden');
+        $('photoInputWrap').classList.add('hidden');
+      }
+      buildCatSelect();
+      renderSuggest();
+    }catch(e){}
+  }
+
+  function clearItemDraft(){
+    try{ localStorage.removeItem(ITEM_DRAFT_KEY); }catch(e){}
+    if(HAS_CLAUDE_STORAGE) storageSet(ITEM_DRAFT_KEY, '');
+  }
+
+  window.SacolinhaDraft = { save: saveItemDraft };
+  window.addEventListener('sacolinha:before-update', saveItemDraft);
+  window.addEventListener('pagehide', saveItemDraft);
+
   /* ============================================================
      MODO ONLINE / OBSERVADOR (Firebase Realtime Database)
      - Offline: zero acesso à internet, só localStorage.
@@ -2671,8 +2735,10 @@
     applyTheme(savedTheme || 'light', false);
 
     const savedOnline = await storageGet('user:onlineMode');
-    onlineMode = savedOnline === '1';
+    const shouldStartOnline = savedOnline === null || savedOnline === '1';
+    onlineMode = shouldStartOnline;
     setOnlineUI(onlineMode);
+    if(shouldStartOnline) await setOnlineMode(true, {silent:true});
 
     const savedLoc = await storageGet('user:shareLocation');
     locationSharing = savedLoc === '1';
@@ -2760,6 +2826,7 @@
       div.addEventListener('click', ()=>{
         selectedCategory = c.key;
         buildCatSelect();
+        saveItemDraft();
       });
       wrap.appendChild(div);
     });
@@ -2827,6 +2894,7 @@
     $('itemUnit').value = (p.cat === 'acougue') ? 'kg' : 'un';
     showPickedIcon(p.emoji);
     hideSuggest();
+    saveItemDraft();
     $('itemQty').focus();
   }
 
@@ -2850,6 +2918,11 @@
     else if(e.key === 'Escape'){ hideSuggest(); }
   });
 
+  ['itemName','itemQty','itemUnit','itemPrice','itemObs'].forEach(function(id){
+    $(id).addEventListener('input', saveItemDraft);
+    $(id).addEventListener('change', saveItemDraft);
+  });
+
   /* ---------- Modal open/close ---------- */
   function openModal(){
     selectedCategory = 'mercearia';
@@ -2868,9 +2941,10 @@
     $('photoInput').value = '';
     buildCatSelect();
     modalOverlay.classList.add('open');
+    restoreItemDraft();
     setTimeout(()=> $('itemName').focus(), 100);
   }
-  function closeModal(){ modalOverlay.classList.remove('open'); }
+  function closeModal(){ saveItemDraft(); modalOverlay.classList.remove('open'); }
   $('createListBtn').addEventListener('click', openModal);
   $('fabAdd').addEventListener('click', openModal);
   $('closeModalBtn').addEventListener('click', closeModal);
@@ -2900,6 +2974,7 @@
         $('photoPreviewImg').src = selectedPhoto;
         $('photoPreview').classList.remove('hidden');
         $('photoInputWrap').classList.add('hidden');
+        saveItemDraft();
       };
       img.src = ev.target.result;
     };
@@ -2942,6 +3017,7 @@
     render();
     syncItemToCloud(newItem);
     showToast('Item anotado!');
+    clearItemDraft();
 
     $('itemName').value = '';
     $('itemQty').value = '1';

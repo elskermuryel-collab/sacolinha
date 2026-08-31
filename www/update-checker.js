@@ -1,220 +1,339 @@
-// Verifica se existe uma versão mais nova do app publicada no GitHub
-// e mostra um POP-UP perguntando se a pessoa quer atualizar agora.
-//
-// Fluxo:
-//   1) Toda vez que o app abre (ou volta de segundo plano), checa a versão.
-//   2) Se tiver versão nova, mostra o pop-up "Sim, atualizar" / "Agora não".
-//   3) Se clicar "Sim", começa o download do APK novo automaticamente.
-//      Quando o download terminar, o Android avisa e a pessoa só precisa
-//      tocar na notificação (ou no arquivo baixado) pra instalar.
-//   4) Se clicar "Agora não", o pop-up não aparece de novo até a pessoa
-//      fechar e abrir o app outra vez (mas continua avisando toda vez que
-//      abrir, enquanto a versão instalada estiver desatualizada).
+/*
+ * Atualização interna da Sacolinha via PWA/Cache Storage.
+ *
+ * Não existe download de APK neste fluxo. O valor abaixo acompanha o
+ * www/version.txt que foi empacotado com esta versão do app.
+ */
 (function () {
-  // ATENÇÃO: troque "elskermuryel-collab/sacolinha" se o nome de usuário
-  // ou do repositório no GitHub mudar no futuro.
-  var REPO = "elskermuryel-collab/sacolinha";
+  var REPO = 'elskermuryel-collab/sacolinha';
+  var VERSION_URL = 'https://github.com/' + REPO + '/releases/latest/download/version.txt';
+  var THROTTLE_MS = 2 * 60 * 1000;
+  var CURRENT_VERSION =
+    (document.querySelector('meta[name="app-version"]') || {}).content || '17';
+  var pendingVersion = null;
+  var preparingPromise = null;
+  var applying = false;
 
-  var APK_URL = "https://github.com/" + REPO + "/releases/latest/download/app-debug.apk";
-  var VERSION_URL = "https://github.com/" + REPO + "/releases/latest/download/version.txt";
-
-  // Tempo mínimo entre checagens de verdade na internet (evita gastar
-  // dados/sinal do mercado se a pessoa ficar abrindo e fechando o app
-  // muito rápido). Isso NÃO impede o pop-up de aparecer de novo — só
-  // evita bater no GitHub toda hora.
-  var THROTTLE_MS = 2 * 60 * 1000; // 2 minutos
-
-  // Usa sessionStorage (não localStorage) de propósito: assim, quando a
-  // pessoa fecha o app de vez e abre outra vez, esquece que ela já tinha
-  // clicado "Agora não" e volta a perguntar — exatamente como pedido.
-  function jaFechouNessaSessao(versao) {
-    try { return sessionStorage.getItem("update_dismissed_session") === versao; } catch (e) { return false; }
-  }
-  function marcarFechadoNessaSessao(versao) {
-    try { sessionStorage.setItem("update_dismissed_session", versao); } catch (e) {}
-  }
-  function baixandoNessaSessao() {
-    try { return sessionStorage.getItem("update_downloading") === "1"; } catch (e) { return false; }
-  }
-  function marcarBaixando() {
-    try { sessionStorage.setItem("update_downloading", "1"); } catch (e) {}
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
-  function removerPopup() {
-    var existente = document.getElementById("update-popup-overlay");
-    if (existente) existente.remove();
-  }
-
-  function mostrarPopup(newVersion) {
-    if (document.getElementById("update-popup-overlay")) return;
-    if (jaFechouNessaSessao(newVersion) || baixandoNessaSessao()) return;
-
-    var overlay = document.createElement("div");
-    overlay.id = "update-popup-overlay";
-    overlay.style.cssText =
-      "position:fixed;inset:0;z-index:99999;background:rgba(10,15,12,.6);" +
-      "display:flex;align-items:center;justify-content:center;padding:22px;" +
-      "font-family:'Manrope',system-ui,sans-serif;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);";
-
-    // Mesma linguagem visual do app (bege/verde/dourado, cantos macios),
-    // em vez do azul genérico que não combinava com nada.
-    overlay.innerHTML =
-      '<div style="background:#FFFFFF;border:1px solid #E2D9BE;border-radius:20px;max-width:340px;' +
-      'width:100%;padding:24px 22px 20px;box-shadow:0 20px 50px rgba(27,43,34,.3);text-align:center;">' +
-        '<div style="font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:700;' +
-        'color:#1F4436;margin-bottom:8px;">Tem versão nova</div>' +
-        '<div id="update-popup-msg" style="font-size:14px;color:#5B6B60;margin-bottom:22px;line-height:1.5;">' +
-          'Uma Sacolinha atualizada acabou de sair. Quer instalar agora?' +
-        '</div>' +
-        '<div id="update-popup-botoes" style="display:flex;gap:10px;">' +
-          '<button id="update-popup-nao" style="flex:1;background:transparent;color:#1F4436;' +
-          'border:1.5px solid #1F4436;border-radius:14px;padding:13px 10px;font-weight:800;' +
-          'font-size:14px;font-family:inherit;">Agora não</button>' +
-          '<button id="update-popup-sim" style="flex:1;background:linear-gradient(145deg,#E3A72B,#B9821A);' +
-          'color:#3A2A05;border:none;border-radius:14px;padding:13px 10px;font-weight:800;' +
-          'font-size:14px;font-family:inherit;">Atualizar</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(overlay);
-
-    document.getElementById("update-popup-sim").addEventListener("click", function () {
-      marcarBaixando();
-
-      var msg = document.getElementById("update-popup-msg");
-      var botoes = document.getElementById("update-popup-botoes");
-      if (botoes) botoes.remove();
-      if (msg) {
-        msg.innerHTML = 'Baixando a atualização... ⬇️';
-      }
-
-      baixarEAbrirInstalador(msg);
-    });
-
-    document.getElementById("update-popup-nao").addEventListener("click", function () {
-      marcarFechadoNessaSessao(newVersion);
-      removerPopup();
-    });
-  }
-
-  // Baixa o APK novo dentro do proprio app e abre a tela de instalacao do
-  // Android sozinho (sem passar pelo navegador nem por notificacao).
-  // Se por qualquer motivo isso nao for possivel (ex.: rodando num celular
-  // muito antigo, ou algo no plugin falhar), cai de volta no jeito antigo
-  // (abrir o link no navegador) pra nunca deixar a pessoa sem conseguir
-  // atualizar.
-  function baixarEAbrirInstalador(msgEl) {
-    function usarNavegadorComoAlternativa(motivo) {
-      window.open(APK_URL, "_blank");
-      if (msgEl) {
-        msgEl.innerHTML =
-          'Abrindo o download no navegador... ⬇️<br><br>' +
-          'Quando terminar, toque na notificação para instalar.';
-      }
-      setTimeout(removerPopup, 6000);
+  function readSession(key, fallback) {
+    try {
+      var value = sessionStorage.getItem(key);
+      return value === null ? fallback : value;
+    } catch (e) {
+      return fallback;
     }
+  }
+
+  function writeSession(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (e) {}
+  }
+
+  function isNewer(remote, local) {
+    var r = String(remote || '').trim();
+    var l = String(local || '').trim();
+    var rn = parseFloat(r.replace(/^v/i, ''));
+    var ln = parseFloat(l.replace(/^v/i, ''));
+
+    if (!isNaN(rn) && !isNaN(ln)) return rn > ln;
+    return r !== l;
+  }
+
+  function removeBanner() {
+    var banner = document.getElementById('sacolinha-update-banner');
+    if (banner) banner.remove();
+  }
+
+  function setSettingsStatus(text, isError) {
+    var status = document.getElementById('sacolinha-update-status');
+    if (!status) return;
+    status.textContent = text;
+    status.style.color = isError ? 'var(--danger)' : 'var(--ink-soft)';
+  }
+
+  function setButtonUpdating(button, updating) {
+    if (!button) return;
+    button.disabled = updating;
+    button.innerHTML = updating
+      ? '<span class="sacolinha-spinner" aria-hidden="true"></span> Atualizando...'
+      : 'Aplicar atualização';
+  }
+
+  function showBanner(version) {
+    pendingVersion = version;
+    if (document.getElementById('sacolinha-update-banner')) return;
+
+    var banner = document.createElement('section');
+    banner.id = 'sacolinha-update-banner';
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
+    banner.style.cssText =
+      'position:fixed;left:14px;right:14px;top:calc(12px + env(safe-area-inset-top));' +
+      'z-index:99998;background:var(--panel,#fff);color:var(--ink,#1b2b22);' +
+      'border:1px solid var(--line,#e2d9be);border-radius:16px;padding:13px 14px;' +
+      'box-shadow:0 12px 32px rgba(27,43,34,.22);display:flex;align-items:center;' +
+      'gap:12px;font:700 13px/1.35 Manrope,system-ui,sans-serif;';
+
+    banner.innerHTML =
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:800;color:var(--primary,#1f4436);">' +
+          'Nova versão disponível! Clique para aplicar' +
+        '</div>' +
+        '<div id="sacolinha-update-status" style="font-size:11px;margin-top:3px;color:var(--ink-soft,#5b6b60);">' +
+          'Os arquivos estão sendo preparados em segundo plano.' +
+        '</div>' +
+      '</div>' +
+      '<button id="sacolinha-update-apply" type="button" style="' +
+        'border:0;border-radius:12px;padding:10px 12px;background:var(--accent,#e3a72b);' +
+        'color:var(--accent-ink,#3a2a05);font:800 12px Manrope,system-ui,sans-serif;' +
+        'white-space:nowrap;cursor:pointer;">Aplicar atualização</button>';
+
+    document.body.appendChild(banner);
+    document.getElementById('sacolinha-update-apply').addEventListener('click', function () {
+      applyUpdate(version);
+    });
+  }
+
+  function notifyBeforeReload() {
+    try {
+      window.dispatchEvent(new CustomEvent('sacolinha:before-update'));
+    } catch (e) {}
+    if (window.SacolinhaDraft && typeof window.SacolinhaDraft.save === 'function') {
+      try { window.SacolinhaDraft.save(); } catch (e) {}
+    }
+  }
+
+  async function getRegistration() {
+    if (!('serviceWorker' in navigator)) return null;
+    try {
+      var registration = await navigator.serviceWorker.getRegistration();
+      if (!registration &&
+          (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        registration = await navigator.serviceWorker.register('service-worker.js');
+      }
+      return registration;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sendWorkerMessage(worker, message, timeoutMs) {
+    return new Promise(function (resolve) {
+      if (!worker) {
+        resolve(false);
+        return;
+      }
+
+      var finished = false;
+      var channel = new MessageChannel();
+      var timer = setTimeout(function () {
+        if (finished) return;
+        finished = true;
+        resolve(false);
+      }, timeoutMs || 3500);
+
+      channel.port1.onmessage = function (event) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        resolve(!!(event.data && event.data.ok));
+      };
+
+      try {
+        worker.postMessage(message, [channel.port2]);
+      } catch (e) {
+        clearTimeout(timer);
+        finished = true;
+        resolve(false);
+      }
+    });
+  }
+
+  async function prepareCache(version) {
+    if (preparingPromise) return preparingPromise;
+
+    preparingPromise = (async function () {
+      var registration = await getRegistration();
+      if (!registration) return false;
+
+      var active = navigator.serviceWorker.controller || registration.active;
+      var refreshed = await sendWorkerMessage(
+        active,
+        { type: 'FORCE_UPDATE', version: version },
+        3500
+      );
+
+      /*
+       * Também pede ao navegador para buscar uma nova versão do próprio
+       * service-worker.js. Isso é importante para quem ainda estava usando
+       * um worker antigo, anterior ao fluxo sem APK.
+       */
+      try { await registration.update(); } catch (e) {}
+      return refreshed || !!registration.active || !!registration.waiting;
+    })().finally(function () {
+      preparingPromise = null;
+    });
+
+    return preparingPromise;
+  }
+
+  async function applyUpdate(version) {
+    if (applying) return;
+    applying = true;
+
+    var button = document.getElementById('sacolinha-update-apply');
+    var status = document.getElementById('sacolinha-update-status');
+    setButtonUpdating(button, true);
+    if (status) status.textContent = 'Salvando seu rascunho e aplicando os arquivos novos...';
+    notifyBeforeReload();
 
     try {
-      var Capacitor = window.Capacitor;
-      if (!Capacitor || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) {
-        // Rodando no navegador normal (não é o app instalado no celular).
-        return usarNavegadorComoAlternativa("nao-nativo");
-      }
-
-      var Filesystem = Capacitor.Plugins && Capacitor.Plugins.Filesystem;
-      var FileTransfer = Capacitor.Plugins && Capacitor.Plugins.FileTransfer;
-      var FileOpener = Capacitor.Plugins && Capacitor.Plugins.FileOpener;
-
-      if (!Filesystem || !FileTransfer || !FileOpener) {
-        return usarNavegadorComoAlternativa("plugin-ausente");
-      }
-
-      Filesystem.getUri({ directory: "CACHE", path: "sacolinha-atualizacao.apk" })
-        .then(function (destino) {
-          return FileTransfer.downloadFile({
-            url: APK_URL,
-            path: destino.uri,
-            progress: true
-          }).then(function () {
-            return FileOpener.openFile({
-              path: destino.uri,
-              mimeType: "application/vnd.android.package-archive"
-            });
-          });
-        })
-        .then(function () {
-          if (msgEl) {
-            msgEl.innerHTML =
-              'Prontinho! ✅<br><br>Agora é só tocar em "Instalar" na tela que o Android abriu.';
-          }
-          setTimeout(removerPopup, 6000);
-        })
-        .catch(function () {
-          usarNavegadorComoAlternativa("erro-download");
-        });
+      await prepareCache(version);
+      await sleep(500);
+      removeBanner();
+      window.location.reload();
     } catch (e) {
-      usarNavegadorComoAlternativa("excecao");
+      applying = false;
+      setButtonUpdating(button, false);
+      if (status) status.textContent = 'Não consegui atualizar agora. Tente novamente.';
+      setSettingsStatus('Não foi possível aplicar a atualização.', true);
     }
   }
 
-  // Compara versões: números viram número ("9" < "10"), qualquer outro
-  // formato cai na comparação de texto mesmo.
-  function ehMaisNova(remota, local) {
-    var r = parseFloat(remota), l = parseFloat(local);
-    if (!isNaN(r) && !isNaN(l) && String(r) === remota.trim() && String(l) === local.trim()) return r > l;
-    return remota !== local;
+  async function fetchRemoteVersion() {
+    var separator = VERSION_URL.indexOf('?') >= 0 ? '&' : '?';
+    var response = await fetch(
+      VERSION_URL + separator + 'check=' + Date.now(),
+      { cache: 'no-store' }
+    );
+    if (!response.ok) return null;
+    var version = (await response.text()).trim();
+    return version || null;
   }
 
-  function checkForUpdate(forcar) {
-    var lastCheck = 0;
-    try { lastCheck = parseInt(sessionStorage.getItem('update_last_check') || '0', 10); } catch (e) {}
-    if (!forcar && Date.now() - lastCheck < THROTTLE_MS) return;
-    try { sessionStorage.setItem('update_last_check', String(Date.now())); } catch (e) {}
+  async function checkForUpdate(force, options) {
+    options = options || {};
+    var lastCheck = parseInt(readSession('sacolinha_update_last_check', '0'), 10) || 0;
+    if (!force && Date.now() - lastCheck < THROTTLE_MS) return null;
+    writeSession('sacolinha_update_last_check', String(Date.now()));
 
-    fetch("version.txt", { cache: "no-store" })
-      .then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (localVersion) {
-        if (!localVersion) return;
-        localVersion = localVersion.trim();
+    try {
+      var remoteVersion = await fetchRemoteVersion();
+      if (!remoteVersion) {
+        if (options.manual) setSettingsStatus('Não foi possível checar agora.', true);
+        return null;
+      }
 
-        fetch(VERSION_URL, { cache: "no-store" })
-          .then(function (r) { return r.ok ? r.text() : null; })
-          .then(function (remoteVersion) {
-            if (!remoteVersion) return;
-            remoteVersion = remoteVersion.trim();
+      if (isNewer(remoteVersion, CURRENT_VERSION)) {
+        showBanner(remoteVersion);
+        setSettingsStatus('Atualização encontrada. Preparando o cache...', false);
+        prepareCache(remoteVersion).then(function () {
+          var status = document.getElementById('sacolinha-update-status');
+          if (status) {
+            status.textContent =
+              'Pronto para aplicar. Seu rascunho será salvo antes de recarregar.';
+          }
+        });
+        return remoteVersion;
+      }
 
-            // Só avisa quando a versão publicada é MAIS NOVA que a instalada.
-            // Comparando por "diferente", uma versão de teste mais adiantada
-            // que a do GitHub ficava pedindo "atualização" pra sempre.
-            if (ehMaisNova(remoteVersion, localVersion)) {
-              mostrarPopup(remoteVersion);
-            }
-          })
-          .catch(function () {});
-      })
-      .catch(function () {});
+      if (options.manual) setSettingsStatus('Você já está usando a versão mais recente.', false);
+      return false;
+    } catch (e) {
+      if (options.manual) setSettingsStatus('Não foi possível checar agora.', true);
+      return null;
+    }
+  }
+
+  function ensureSettingsUI() {
+    var actions = document.querySelector('.header-actions');
+    if (!actions || document.getElementById('sacolinha-settings-button')) return;
+
+    var settingsButton = document.createElement('button');
+    settingsButton.className = 'mini-btn';
+    settingsButton.id = 'sacolinha-settings-button';
+    settingsButton.type = 'button';
+    settingsButton.title = 'Configurações';
+    settingsButton.setAttribute('aria-label', 'Configurações');
+    settingsButton.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/>' +
+      '<path d="m19.4 15 .1.1a1.9 1.9 0 0 1-2.7 2.7l-.1-.1a1.9 1.9 0 0 0-3.2 1.4v.2a1.9 1.9 0 0 1-3.8 0v-.2a1.9 1.9 0 0 0-3.2-1.4l-.1.1a1.9 1.9 0 1 1-2.7-2.7l.1-.1a1.9 1.9 0 0 0-1.4-3.2h-.2a1.9 1.9 0 0 1 0-3.8h.2a1.9 1.9 0 0 0 1.4-3.2l-.1-.1A1.9 1.9 0 1 1 6.5 2l.1.1a1.9 1.9 0 0 0 3.2-1.4V.5a1.9 1.9 0 0 1 3.8 0v.2a1.9 1.9 0 0 0 3.2 1.4l.1-.1a1.9 1.9 0 1 1 2.7 2.7l-.1.1a1.9 1.9 0 0 0 1.4 3.2h.2a1.9 1.9 0 0 1 0 3.8h-.2a1.9 1.9 0 0 0-1.4 3.2Z"/>' +
+      '</svg><span class="mini-label">Configurações</span>';
+    actions.appendChild(settingsButton);
+
+    var overlay = document.createElement('div');
+    overlay.id = 'sacolinha-settings-overlay';
+    overlay.style.cssText =
+      'display:none;position:fixed;inset:0;z-index:99997;background:rgba(10,15,12,.55);' +
+      'align-items:center;justify-content:center;padding:20px;font-family:Manrope,system-ui,sans-serif;';
+    overlay.innerHTML =
+      '<div style="width:min(390px,100%);background:var(--panel,#fff);color:var(--ink,#1b2b22);' +
+      'border:1px solid var(--line,#e2d9be);border-radius:20px;padding:22px;box-shadow:0 20px 50px rgba(27,43,34,.3);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
+          '<h2 style="margin:0;color:var(--primary,#1f4436);font:800 22px Fraunces,Georgia,serif;">Configurações</h2>' +
+          '<button id="sacolinha-settings-close" type="button" aria-label="Fechar" style="' +
+            'border:0;border-radius:50%;width:32px;height:32px;background:var(--line-soft,#eee7d3);' +
+            'color:var(--ink-soft,#5b6b60);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<p style="margin:8px 0 18px;color:var(--ink-soft,#5b6b60);font-size:13px;line-height:1.5;">' +
+          'O app usa internet por padrão para sincronizar e verificar novidades. Você pode desligar o modo online no cabeçalho.' +
+        '</p>' +
+        '<button id="sacolinha-manual-update" type="button" style="' +
+          'width:100%;border:0;border-radius:14px;padding:13px 14px;background:var(--accent,#e3a72b);' +
+          'color:var(--accent-ink,#3a2a05);font:800 14px Manrope,system-ui,sans-serif;cursor:pointer;">' +
+          'Verificar novas atualizações</button>' +
+        '<p id="sacolinha-update-status" style="min-height:18px;margin:12px 2px 0;color:var(--ink-soft,#5b6b60);font-size:12px;line-height:1.4;"></p>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    function closeSettings() { overlay.style.display = 'none'; }
+    settingsButton.addEventListener('click', function () { overlay.style.display = 'flex'; });
+    document.getElementById('sacolinha-settings-close').addEventListener('click', closeSettings);
+    overlay.addEventListener('click', function (event) {
+      if (event.target === overlay) closeSettings();
+    });
+    document.getElementById('sacolinha-manual-update').addEventListener('click', async function () {
+      var button = this;
+      button.disabled = true;
+      button.innerHTML = '<span class="sacolinha-spinner" aria-hidden="true"></span> Verificando...';
+      await checkForUpdate(true, { manual: true });
+      button.disabled = false;
+      button.textContent = 'Verificar novas atualizações';
+    });
+  }
+
+  function injectStyles() {
+    if (document.getElementById('sacolinha-update-styles')) return;
+    var style = document.createElement('style');
+    style.id = 'sacolinha-update-styles';
+    style.textContent =
+      '@keyframes sacolinha-spin{to{transform:rotate(360deg)}}' +
+      '.sacolinha-spinner{display:inline-block;width:13px;height:13px;border:2px solid currentColor;' +
+      'border-right-color:transparent;border-radius:50%;vertical-align:-2px;' +
+      'animation:sacolinha-spin .7s linear infinite;margin-right:5px}' +
+      '#sacolinha-update-apply:disabled,#sacolinha-manual-update:disabled{opacity:.7;cursor:wait}';
+    document.head.appendChild(style);
   }
 
   function start() {
-    // Checa logo que o app abre.
-    setTimeout(function () { checkForUpdate(true); }, 1000);
+    injectStyles();
+    ensureSettingsUI();
+    setTimeout(function () { checkForUpdate(false); }, 900);
   }
 
-  // Checa de novo toda vez que o app volta pra frente (a pessoa saiu e
-  // voltou, trocou de aplicativo e retornou, etc.) — é o "quando a pessoa
-  // entra" no app.
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") {
-      checkForUpdate(false);
-    }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') checkForUpdate(false);
   });
-  window.addEventListener("focus", function () {
-    checkForUpdate(false);
-  });
+  window.addEventListener('focus', function () { checkForUpdate(false); });
+  window.addEventListener('pageshow', function () { checkForUpdate(false); });
 
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    start();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    document.addEventListener("DOMContentLoaded", start);
+    start();
   }
 })();
