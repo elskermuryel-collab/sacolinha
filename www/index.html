@@ -3192,5 +3192,22 @@
 })();
 </script>
 <script src="update-checker.js"></script>
+<script>
+  // Selo de versão visível, só para teste do sistema de atualização.
+  // Lê o version.txt local (arquivo do próprio app, sem CORS) — é o número
+  // que o workflow do GitHub grava sozinho a cada build.
+  (function(){
+    var badge = document.createElement('div');
+    badge.textContent = 'v...';
+    badge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'
+      + 'background:rgba(31,68,54,0.85);color:#fff;font:12px sans-serif;'
+      + 'padding:4px 8px;border-radius:8px;pointer-events:none;';
+    document.body.appendChild(badge);
+    fetch('version.txt', {cache:'no-store'})
+      .then(function(r){ return r.text(); })
+      .then(function(t){ badge.textContent = 'v' + t.trim(); })
+      .catch(function(){ badge.textContent = 'v?'; });
+  })();
+</script>
 </body>
 </html>
