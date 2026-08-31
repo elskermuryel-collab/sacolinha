@@ -132,6 +132,12 @@ Write-Host ""
 # ---- 3) Confirma a atualizacao no GitHub (commit + push) ----
 Set-Location $destino
 
+# Puxa primeiro qualquer mudanca que o GitHub Actions tenha mandado de volta
+# (o build grava o numero da versao no version.txt e da commit sozinho).
+# Sem isso, o push seguinte pode ser rejeitado com "fetch first".
+git fetch origin main --quiet
+git pull origin main --rebase --quiet
+
 git add -A
 
 $temMudanca = git status --porcelain
