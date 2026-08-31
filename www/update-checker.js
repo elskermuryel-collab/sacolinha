@@ -6,7 +6,12 @@
  */
 (function () {
   var REPO = 'elskermuryel-collab/sacolinha';
-  var VERSION_URL = 'https://github.com/' + REPO + '/releases/latest/download/version.txt';
+  var VERSION_BRANCH = 'main';
+  // Trocado de github.com/.../releases/latest/download/ para raw.githubusercontent.com:
+  // o endereço de releases NÃO envia o cabeçalho CORS (Access-Control-Allow-Origin),
+  // então o navegador/WebView bloqueava esse fetch em silêncio e a checagem de
+  // atualização nunca funcionava. O raw.githubusercontent.com envia esse cabeçalho.
+  var VERSION_URL = 'https://raw.githubusercontent.com/' + REPO + '/' + VERSION_BRANCH + '/www/version.txt';
   var THROTTLE_MS = 2 * 60 * 1000;
   var CURRENT_VERSION =
     (document.querySelector('meta[name="app-version"]') || {}).content || '17';

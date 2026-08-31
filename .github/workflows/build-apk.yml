@@ -29,6 +29,14 @@ jobs:
       - name: Gravar número da versão
         run: echo "${{ github.run_number }}" > www/version.txt
 
+      - name: Salvar version.txt no repositório (necessário para o app checar via raw.githubusercontent.com)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add www/version.txt
+          git diff --cached --quiet || git commit -m "Atualiza version.txt para ${{ github.run_number }} [skip ci]"
+          git push || echo "Nada novo para enviar"
+
       - name: Criar package.json e instalar Capacitor
         run: |
           npm init -y
