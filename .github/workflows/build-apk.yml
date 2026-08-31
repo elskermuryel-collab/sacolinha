@@ -37,7 +37,7 @@ jobs:
 
       - name: Inicializar e Sincronizar Projeto Android
         run: |
-          npx cap init "Sacolinha App" "com.bramu.sacolinha" --web-dir www
+          npx cap init "Sacolinha" "com.bramu.sacolinha" --web-dir www
           npx cap add android
           npx cap sync android
 
