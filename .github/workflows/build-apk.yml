@@ -26,22 +26,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Gravar número da versão
-        run: echo "${{ github.run_number }}" > www/version.txt
-
-      - name: Salvar version.txt no repositório (necessário para o app checar via raw.githubusercontent.com)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add www/version.txt
-          git diff --cached --quiet || git commit -m "Atualiza version.txt para ${{ github.run_number }} [skip ci]"
-          git push || echo "Nada novo para enviar"
-
       - name: Criar package.json e instalar Capacitor
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npm install @capacitor/filesystem @capacitor/file-transfer @capawesome-team/capacitor-file-opener
+          npm install @capacitor/filesystem @capawesome-team/capacitor-file-opener
 
       - name: Inicializar e Sincronizar Projeto Android
         run: |
@@ -49,15 +38,11 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Habilitar download + instalação automática da atualização
+      - name: Permitir salvar e abrir a imagem da notinha
         run: |
-          # Permissão que deixa o app pedir pra instalar o APK baixado sem
-          # precisar passar pela tela extra de "permitir fontes desconhecidas".
-          sed -i '/android.permission.INTERNET/a\    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' android/app/src/main/AndroidManifest.xml
-
-          # Arquivo exigido pelo plugin de abrir/instalar arquivo (FileProvider),
-          # que informa quais pastas do app podem ser compartilhadas com o
-          # instalador de pacotes do Android.
+          # Arquivo exigido pelo plugin de abrir arquivo (FileProvider), que
+          # informa quais pastas do app podem ser compartilhadas com a galeria
+          # e com outros aplicativos.
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -108,4 +93,3 @@ jobs:
           name: "Última versão"
           files: |
             android/app/build/outputs/apk/debug/app-debug.apk
-            www/version.txt

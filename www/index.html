@@ -422,6 +422,70 @@
     width:100%; display:block; border-radius:10px; border:1px solid var(--line-soft);
   }
 
+  /* ---------- BARRA DE LISTAS ---------- */
+  .list-bar{
+    display:flex; align-items:center; gap:8px;
+    margin:0 0 4px;
+  }
+  /* A notinha de quem está comprando entra no meio dos cards do app,
+     então precisa do mesmo respiro que os vizinhos. */
+  #mainReceiptBox{ margin-top:12px; }
+  .list-current{
+    flex:1; min-width:0;
+    display:flex; align-items:center; gap:9px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:10px 12px;
+    font:inherit; color:var(--ink); cursor:pointer; text-align:left;
+    box-shadow:var(--shadow);
+    transition:border-color .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+  }
+  .list-current:hover{ border-color:var(--primary); transform:translateY(-1px); }
+  .list-current svg{ width:15px; height:15px; flex-shrink:0; color:var(--primary); }
+  .list-current .chev{ width:14px; height:14px; margin-left:auto; color:var(--ink-faint); }
+  .list-current .nm{
+    font-weight:800; font-size:14.5px; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .list-current .ct{ font-size:11.5px; font-weight:700; color:var(--ink-faint); flex-shrink:0; }
+  .list-new{
+    background:color-mix(in srgb, var(--primary) 10%, var(--panel));
+    border:1px solid color-mix(in srgb, var(--primary) 38%, transparent);
+    color:var(--primary); font-family:inherit; font-size:12.5px; font-weight:800;
+    padding:11px 13px; border-radius:14px; cursor:pointer; white-space:nowrap;
+    transition:background .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+  }
+  .list-new:hover{ background:color-mix(in srgb, var(--primary) 18%, var(--panel)); transform:translateY(-1px); }
+  .list-new:active{ transform:scale(0.96); }
+
+  .lists-collection{ display:flex; flex-direction:column; gap:9px; margin-top:6px; }
+  .list-row{
+    display:flex; align-items:center; gap:10px;
+    border:1px solid var(--line); border-radius:14px;
+    background:var(--panel-soft); padding:11px 12px;
+  }
+  .list-row.sel{
+    border-color:var(--primary);
+    background:color-mix(in srgb, var(--primary) 9%, var(--panel));
+  }
+  .list-row .pick{
+    flex:1; min-width:0; text-align:left; background:none; border:none;
+    font:inherit; color:var(--ink); cursor:pointer; padding:0;
+  }
+  .list-row .pick .nm{ font-weight:800; font-size:14.5px; display:block; }
+  .list-row .pick .st{ font-size:11.5px; color:var(--ink-faint); font-weight:600; margin-top:2px; display:block; }
+  .list-row.sel .pick .st{ color:var(--primary); }
+  .list-row .act{
+    background:none; border:none; cursor:pointer; color:var(--ink-faint);
+    width:30px; height:30px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .list-row .act svg{ width:15px; height:15px; }
+  .list-row .act:hover{ color:var(--primary); background:var(--line-soft); }
+  .list-row .act.danger:hover{ color:var(--danger); }
+
+  .receipt-actions{ display:flex; gap:9px; margin-top:11px; }
+  .receipt-actions .btn{ flex:1; padding:11px 12px; font-size:12.5px; }
+
   /* ---------- EMPTY STATE ---------- */
   .empty-state{
     text-align:center; padding:48px 24px; color:var(--ink-soft);
@@ -440,10 +504,11 @@
   .category-head .n{font-size:12px; color:var(--ink-faint); font-weight:700;}
 
   .item-card{
+    position:relative;
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:16px;
-    padding:13px 40px 13px 13px;
+    padding:13px 62px 13px 13px;
     display:flex; align-items:center; gap:12px;
     margin-bottom:10px;
     position:relative;
@@ -524,6 +589,13 @@
     border-radius:50%; opacity:0.6; transition:opacity .15s ease, color .15s ease;
   }
   .del-btn:hover, .del-btn:focus-visible{color:var(--danger); opacity:1;}
+  .edit-btn{
+    position:absolute; top:9px; right:34px;
+    background:none; border:none; cursor:pointer; color:var(--ink-faint);
+    padding:4px; line-height:0; opacity:0.55; transition:color .15s ease, opacity .15s ease;
+  }
+  .edit-btn svg{ width:14px; height:14px; }
+  .edit-btn:hover, .edit-btn:focus-visible{ color:var(--primary); opacity:1; }
 
   /* ---------- FAB ---------- */
   .fab{
@@ -632,15 +704,36 @@
   .dialog-actions .btn{ flex:1; padding:12px 14px; font-size:14px; }
 
   .lightbox{
-    position:fixed; inset:0; z-index:320; background:rgba(10,15,12,0.88);
-    display:none; align-items:center; justify-content:center; padding:18px;
-    cursor:zoom-out;
+    position:fixed; inset:0; z-index:320; background:rgba(10,15,12,0.92);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; padding:18px;
   }
   .lightbox.open{display:flex;}
+  .lightbox-bar{
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+  }
+  .lightbox-bar button{
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.28);
+    color:#F6F3E7; font-family:inherit; font-size:12.5px; font-weight:700;
+    padding:9px 15px; border-radius:30px; cursor:pointer;
+    display:flex; align-items:center; gap:7px;
+    transition:background .18s ease;
+  }
+  .lightbox-bar button svg{ width:14px; height:14px; }
+  .lightbox-bar button:hover{ background:rgba(255,255,255,0.24); }
+  .lightbox .shot{
+    flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    width:100%; overflow:auto; cursor:zoom-in;
+  }
   .lightbox img{
     max-width:100%; max-height:100%; border-radius:12px;
     box-shadow:0 24px 60px rgba(0,0,0,0.5);
+    transition:transform .3s cubic-bezier(.22,1,.36,1);
+    transform-origin:center top;
   }
+  .lightbox.zoomed .shot{ align-items:flex-start; cursor:zoom-out; }
+  .lightbox.zoomed img{ max-width:none; max-height:none; width:200%; }
+  .lightbox:fullscreen{ background:#0C110E; }
 
   .btn:focus-visible, .quick-status-btn:focus-visible, .stamp:focus-visible,
   .cat-opt:focus-visible, .user-pick-card:focus-visible{
@@ -727,6 +820,16 @@
     </header>
 
     <main>
+      <div class="list-bar">
+        <button class="list-current" type="button" id="listPickerBtn" title="Trocar de lista">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+          <span class="nm" id="activeListName">Minha lista</span>
+          <span class="ct" id="activeListCount"></span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="list-new" type="button" id="newListBtn">+ Nova lista</button>
+      </div>
+
       <div class="progress-card" id="progressCard">
         <div class="progress-top">
           <span class="count" id="progressCount">0 de 0 comprados</span>
@@ -745,6 +848,23 @@
         <div class="txt">
           <div id="mainRecadoText"></div>
           <div class="when" id="mainRecadoWhen"></div>
+        </div>
+      </div>
+
+      <div id="mainReceiptBox" class="observer-receipt hidden">
+        <div class="observer-receipt-head">
+          <span class="em"><svg class="ico ico-lg" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path fill="#F8F6ED" stroke="currentColor" stroke-width="4" d="M26 16h48v58l-8 6-8-6-8 6-8-6-8 6-8-6Z"/><path stroke="#B9BEC4" stroke-width="3" d="M36 32h28M36 44h28M36 56h18"/></svg></span>
+          <div class="txt">
+            <div>Sua notinha da compra</div>
+            <div class="when" id="mainReceiptWhen"></div>
+          </div>
+        </div>
+        <button class="receipt-zoom" type="button" id="mainReceiptZoom" title="Ver a notinha em tela grande">
+          <img id="mainReceiptImg" alt="Notinha da compra">
+        </button>
+        <div class="receipt-actions">
+          <button class="btn btn-outline" type="button" id="mainReceiptDownload">Baixar imagem</button>
+          <button class="btn btn-primary" type="button" id="mainReceiptFull">Tela grande</button>
         </div>
       </div>
 
@@ -841,9 +961,13 @@
               <div class="when" id="observerReceiptWhen"></div>
             </div>
           </div>
-          <button class="receipt-zoom" type="button" id="observerReceiptZoom" title="Ampliar o recibo">
+          <button class="receipt-zoom" type="button" id="observerReceiptZoom" title="Ver a notinha em tela grande">
             <img id="observerReceiptImg" alt="Recibo da compra">
           </button>
+          <div class="receipt-actions">
+            <button class="btn btn-outline" type="button" id="observerReceiptDownload">Baixar imagem</button>
+            <button class="btn btn-primary" type="button" id="observerReceiptFull">Tela grande</button>
+          </div>
         </div>
         <div id="observerLocationBox" class="observer-location-wrap hidden">
           <div id="observerMap" class="observer-map hidden"></div>
@@ -870,7 +994,7 @@
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-head">
-      <h2>Anotar item</h2>
+      <h2 id="modalTitle">Anotar item</h2>
       <button id="closeModalBtn">✕</button>
     </div>
 
@@ -935,7 +1059,42 @@
       <button class="btn btn-outline btn-block" id="finishAddBtn">Concluir</button>
       <button class="btn btn-primary btn-block" id="saveItemBtn">Anotar</button>
     </div>
-    <p class="field-hint" style="text-align:center; margin-top:10px;">Cada item já entra como comprado assim que você clica em "Anotar". Pode desmarcar se colocou por engano.</p>
+    <p class="field-hint" style="text-align:center; margin-top:10px;" id="modalHint">Cada item já entra como comprado assim que você clica em "Anotar". Digitou errado? Toque no lápis do item pra corrigir.</p>
+  </div>
+</div>
+
+<!-- MODAL: LISTAS -->
+<div class="modal-overlay" id="listsOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Suas listas</h2>
+      <button id="closeListsBtn">✕</button>
+    </div>
+
+    <div class="field">
+      <label for="newListName">Criar uma lista nova</label>
+      <div class="broadcast-input-row">
+        <input type="text" id="newListName" maxlength="40" placeholder="Ex: Feira da semana">
+        <button class="btn btn-primary" type="button" id="createListConfirmBtn">Criar</button>
+      </div>
+      <p class="field-hint">Cada lista guarda os próprios itens, total e notinha. Trocar de lista não apaga nada.</p>
+    </div>
+
+    <div id="listsCollection" class="lists-collection"></div>
+  </div>
+</div>
+
+<!-- PROMPT DIALOG (renomear lista) -->
+<div class="dialog-overlay" id="promptOverlay" role="dialog" aria-modal="true" aria-labelledby="promptTitle">
+  <div class="dialog">
+    <h3 id="promptTitle">Renomear</h3>
+    <div class="field" style="margin:12px 0 0;">
+      <input type="text" id="promptInput" maxlength="40">
+    </div>
+    <div class="dialog-actions">
+      <button class="btn btn-outline" type="button" id="promptCancel">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="promptOk">Salvar</button>
+    </div>
   </div>
 </div>
 
@@ -951,9 +1110,16 @@
   </div>
 </div>
 
-<!-- LIGHTBOX (recibo ampliado) -->
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Recibo ampliado">
-  <img id="lightboxImg" alt="Recibo da compra">
+<!-- LIGHTBOX (notinha em tela grande) -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Notinha em tela grande">
+  <div class="lightbox-bar">
+    <button type="button" id="lightboxDownload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>Baixar imagem</button>
+    <button type="button" id="lightboxFull"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>Tela cheia</button>
+    <button type="button" id="lightboxClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Fechar</button>
+  </div>
+  <div class="shot" id="lightboxShot">
+    <img id="lightboxImg" alt="Notinha da compra">
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1721,13 +1887,20 @@
   }
 
   let userName = null;
-  let items = [];
+  let items = [];          // itens da lista que está aberta agora
+  let lists = [];          // todas as listas: {id, nome, criadoEm, itens:[]}
+  let activeListId = null;
+  let editingId = null;    // id do item que está sendo corrigido (null = novo item)
+  let currentReceipt = null; // última notinha gerada neste aparelho
   let selectedCategory = 'mercearia';
   let selectedPhoto = null;
   let pickedProduct = null;
   let suggestList = [];
   let suggestIdx = -1;
   let celebrated = false;
+
+  const PENCIL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+  const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>';
 
   const $ = (id) => document.getElementById(id);
   const welcomeScreen = $('welcomeScreen');
@@ -1763,18 +1936,74 @@
     });
   }
 
-  function openLightbox(src){
+  let lightboxSrc = null;
+  /* Igual ao askConfirm, mas com um campo de texto: serve pra renomear
+     lista sem usar o prompt() do sistema, que no Android aparece como
+     "index.html diz..." e assusta. */
+  function askText(title, value, okLabel){
+    return new Promise(function(resolve){
+      const ov = $('promptOverlay'), ok = $('promptOk'), no = $('promptCancel'), inp = $('promptInput');
+      $('promptTitle').textContent = title || 'Renomear';
+      ok.textContent = okLabel || 'Salvar';
+      inp.value = value || '';
+      ov.classList.add('open');
+      const prev = closeTopLayer;
+      function done(v){
+        ov.classList.remove('open');
+        ok.onclick = null; no.onclick = null; ov.onclick = null; inp.onkeydown = null;
+        closeTopLayer = prev;
+        resolve(v);
+      }
+      ok.onclick = function(){ done(inp.value); };
+      no.onclick = function(){ done(null); };
+      ov.onclick = function(e){ if(e.target === ov) done(null); };
+      inp.onkeydown = function(e){ if(e.key === 'Enter'){ e.preventDefault(); done(inp.value); } };
+      closeTopLayer = function(){ done(null); };
+      setTimeout(function(){ inp.focus(); inp.select(); }, 60);
+    });
+  }
+
+  function openLightbox(src, telaCheia){
     if(!src) return;
+    lightboxSrc = src;
     $('lightboxImg').src = src;
-    $('lightbox').classList.add('open');
+    const box = $('lightbox');
+    box.classList.remove('zoomed');
+    box.classList.add('open');
     closeTopLayer = closeLightbox;
+    if(telaCheia) goFullscreen();
   }
   function closeLightbox(){
-    $('lightbox').classList.remove('open');
+    const box = $('lightbox');
+    box.classList.remove('open');
+    box.classList.remove('zoomed');
     $('lightboxImg').removeAttribute('src');
+    lightboxSrc = null;
     closeTopLayer = null;
+    if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} }
   }
-  $('lightbox').addEventListener('click', closeLightbox);
+  /* Alguns aparelhos (iPhone, WebView antiga) não deixam entrar em tela
+     cheia de verdade. Nesses casos a imagem já aparece ampliada na tela
+     inteira do app, então só avisamos em vez de quebrar. */
+  function goFullscreen(){
+    const box = $('lightbox');
+    const fn = box.requestFullscreen || box.webkitRequestFullscreen;
+    if(!fn){ showToast('Aqui não dá tela cheia, mas a imagem já está ampliada.'); return; }
+    try{
+      const r = fn.call(box);
+      if(r && r.catch) r.catch(function(){});
+    }catch(e){}
+  }
+  $('lightbox').addEventListener('click', function(e){ if(e.target === $('lightbox')) closeLightbox(); });
+  $('lightboxShot').addEventListener('click', function(e){
+    if(e.target === $('lightboxShot')){ closeLightbox(); return; }
+    $('lightbox').classList.toggle('zoomed');
+  });
+  $('lightboxClose').addEventListener('click', closeLightbox);
+  $('lightboxFull').addEventListener('click', goFullscreen);
+  $('lightboxDownload').addEventListener('click', function(){
+    if(lightboxSrc) saveImageToDevice(lightboxSrc, receiptFileName(currentReceipt));
+  });
 
   // Esc fecha a camada de cima (lightbox > confirmação > modal de item).
   document.addEventListener('keydown', function(e){
@@ -1834,6 +2063,62 @@
     }catch(e){ showToast('Erro ao salvar.'); return null; }
   }
 
+  /* ---------- VÁRIAS LISTAS ----------
+     Cada lista guarda os próprios itens. O array `items` continua sendo a
+     lista aberta no momento (é o mesmo array de dentro de `lists`), então o
+     resto do app não precisou mudar de jeito nenhum. */
+  const LISTS_KEY = 'shopping:lists';
+  const ACTIVE_KEY = 'shopping:activeList';
+  const LEGACY_ITEMS_KEY = 'shopping:items';
+  const RECEIPT_KEY = 'shopping:recibo';
+
+  function newListId(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  }
+  function activeList(){
+    return lists.find(l => l.id === activeListId) || null;
+  }
+  function defaultListName(){
+    const base = 'Lista de ' + new Date().toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+    let nome = base, n = 2;
+    while(lists.some(l => (l.nome||'').toLowerCase() === nome.toLowerCase())){ nome = base + ' (' + n + ')'; n++; }
+    return nome;
+  }
+  async function saveLists(){
+    const atual = activeList();
+    if(atual) atual.itens = items;
+    await storageSet(LISTS_KEY, JSON.stringify(lists));
+    await storageSet(ACTIVE_KEY, activeListId || '');
+  }
+  async function loadLists(){
+    let parsed = null;
+    const raw = await storageGet(LISTS_KEY);
+    try{ parsed = raw ? JSON.parse(raw) : null; }catch(e){ parsed = null; }
+    lists = Array.isArray(parsed) ? parsed : [];
+
+    // Quem já usava a versão de lista única não perde nada: os itens que
+    // estavam salvos viram a primeira lista.
+    if(lists.length === 0){
+      let antigos = [];
+      const legado = await storageGet(LEGACY_ITEMS_KEY);
+      try{ antigos = legado ? JSON.parse(legado) : []; }catch(e){ antigos = []; }
+      lists = [{ id: newListId(), nome: 'Minha lista', criadoEm: Date.now(), itens: Array.isArray(antigos) ? antigos : [] }];
+      await storageSet(LISTS_KEY, JSON.stringify(lists));
+    }
+    lists.forEach(l=>{
+      if(!l.id) l.id = newListId();
+      if(!l.nome) l.nome = 'Lista sem nome';
+      if(!Array.isArray(l.itens)) l.itens = [];
+    });
+
+    activeListId = await storageGet(ACTIVE_KEY);
+    if(!lists.some(l => l.id === activeListId)) activeListId = lists[0].id;
+    items = activeList().itens;
+
+    const rawRec = await storageGet(RECEIPT_KEY);
+    try{ currentReceipt = rawRec ? JSON.parse(rawRec) : null; }catch(e){ currentReceipt = null; }
+  }
+
   /* ---------- RASCUNHO DO ITEM ----------
      O rascunho fica no aparelho e é salvo a cada alteração. Assim uma
      atualização da página não apaga o que estava sendo digitado.
@@ -1846,6 +2131,9 @@
   }
 
   function saveItemDraft(){
+    // No modo correção o modal já vem preenchido com o item de verdade;
+    // salvar isso como rascunho reapareceria depois num item novo.
+    if(editingId) return;
     if(!modalOverlay || !modalOverlay.classList.contains('open')) return;
     const draft = {
       nome: $('itemName').value,
@@ -1893,8 +2181,6 @@
     if(HAS_CLAUDE_STORAGE) storageSet(ITEM_DRAFT_KEY, '');
   }
 
-  window.SacolinhaDraft = { save: saveItemDraft };
-  window.addEventListener('sacolinha:before-update', saveItemDraft);
   window.addEventListener('pagehide', saveItemDraft);
 
   /* ============================================================
@@ -2166,7 +2452,13 @@
   async function clearCloudList(){
     if(!onlineMode || !ensureFirebase() || !userName) return;
     currentUid = cloudUid();
-    try{ await firebase.database().ref('listas/'+currentUid+'/itens').remove(); trackData(estimateWireBytes(0)); setLastFullSyncSignature(''); }catch(e){}
+    try{
+      await firebase.database().ref('listas/'+currentUid+'/itens').remove();
+      // a notinha antiga é de outra lista/compra: sai junto
+      await firebase.database().ref('listas/'+currentUid+'/recibo').remove();
+      trackData(estimateWireBytes(0));
+      setLastFullSyncSignature('');
+    }catch(e){}
   }
   /* ---------- Rastreador de localização (atualiza a cada 30s) ----------
      Antes usava getCurrentPosition() a cada 30s com maximumAge de 20s, o
@@ -2295,9 +2587,16 @@
   $('broadcastSendBtn').addEventListener('click', ()=> sendBroadcastMessage());
   $('broadcastInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') sendBroadcastMessage(); });
   document.querySelectorAll('.quick-status-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
+      // "Finalizar compra" monta a notinha aqui no aparelho primeiro (por
+      // isso vale até sem internet) e só depois avisa quem está observando.
+      if(btn.id === 'statusFinalizarBtn'){
+        const rec = await generateReceipt();
+        if(onlineMode) sendBroadcastMessage(btn.getAttribute('data-status'));
+        if(rec) sendReceiptToCloud(rec);
+        return;
+      }
       sendBroadcastMessage(btn.getAttribute('data-status'));
-      if(btn.id === 'statusFinalizarBtn') sendReceiptToCloud();
     });
   });
 
@@ -2321,15 +2620,20 @@
 
   function buildReceiptCanvas(){
     const boughtItems = items.filter(i=>i.comprado);
+    const listName = (activeList() || {}).nome || '';
     const width = 360;
     const padX = 20;
     const rowH = 38;
-    const height = 78 + boughtItems.length * rowH + 74;
+    const height = 78 + (listName ? 18 : 0) + boughtItems.length * rowH + 74;
 
+    // Desenhado em 2x: as medidas continuam as mesmas aqui embaixo, mas a
+    // imagem sai nítida quando alguém abre em tela cheia ou baixa o arquivo.
+    const SCALE = 2;
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = width * SCALE;
+    canvas.height = height * SCALE;
     const ctx = canvas.getContext('2d');
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
 
     // Fundo branco puro (não o bege do tema): poucas cores = PNG bem mais leve.
     ctx.fillStyle = '#FFFFFF';
@@ -2346,7 +2650,19 @@
     ctx.fillStyle = '#6B7A6F';
     const dataStr = new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     ctx.fillText((userName ? userName + ' · ' : '') + dataStr, width/2, y);
-    y += 20;
+    y += 16;
+    if(listName){
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillStyle = '#1F4436';
+      let ln = listName;
+      if(ctx.measureText(ln).width > width - padX*2){
+        while(ln.length > 1 && ctx.measureText(ln+'…').width > width - padX*2) ln = ln.slice(0, -1);
+        ln += '…';
+      }
+      ctx.fillText(ln, width/2, y);
+      y += 18;
+    }
+    y += 4;
 
     drawDashedLine(ctx, padX, width-padX, y);
     y += 12;
@@ -2395,19 +2711,151 @@
     return canvas;
   }
 
-  async function sendReceiptToCloud(){
-    if(!onlineMode || !ensureFirebase() || !userName) return;
+  /* A notinha agora nasce no aparelho de quem está comprando: ela aparece
+     na tela dele na hora (mesmo sem internet), pode ser baixada e vista em
+     tela grande, e só depois é enviada pra quem estiver observando. */
+  async function generateReceipt(){
     const boughtItems = items.filter(i=>i.comprado);
-    if(boughtItems.length === 0) return;
-    currentUid = cloudUid();
+    if(boughtItems.length === 0){
+      showToast('Marque pelo menos um item como comprado.');
+      return null;
+    }
     try{
       const canvas = buildReceiptCanvas();
-      const imagem = canvas.toDataURL('image/png');
-      const recibo = { imagem: imagem, total: listTotal(boughtItems), itens: boughtItems.length, criadoEm: Date.now() };
+      currentReceipt = {
+        listId: activeListId,
+        lista: (activeList() || {}).nome || '',
+        imagem: canvas.toDataURL('image/png'),
+        total: listTotal(boughtItems),
+        itens: boughtItems.length,
+        criadoEm: Date.now()
+      };
+      await storageSet(RECEIPT_KEY, JSON.stringify(currentReceipt));
+      renderMainReceipt();
+      showToast('Notinha pronta!');
+      return currentReceipt;
+    }catch(e){
+      showToast('Não foi possível montar a notinha agora.');
+      return null;
+    }
+  }
+
+  async function dropReceipt(){
+    currentReceipt = null;
+    try{ localStorage.removeItem(RECEIPT_KEY); }catch(e){}
+    if(HAS_CLAUDE_STORAGE) await storageSet(RECEIPT_KEY, '');
+    renderMainReceipt();
+  }
+
+  function renderMainReceipt(){
+    const box = $('mainReceiptBox');
+    if(!box) return;
+    if(!currentReceipt || !currentReceipt.imagem || currentReceipt.listId !== activeListId){
+      box.classList.add('hidden');
+      $('mainReceiptImg').removeAttribute('src');
+      return;
+    }
+    box.classList.remove('hidden');
+    $('mainReceiptImg').src = currentReceipt.imagem;
+    const d = new Date(currentReceipt.criadoEm || Date.now());
+    const quando = d.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+    $('mainReceiptWhen').textContent = quando + ' · ' + currentReceipt.itens +
+      (currentReceipt.itens === 1 ? ' item · ' : ' itens · ') + formatBRL(currentReceipt.total);
+  }
+
+  function receiptFileName(rec){
+    const d = new Date((rec && rec.criadoEm) || Date.now());
+    const dd = n => String(n).padStart(2, '0');
+    return 'notinha-sacolinha-' + d.getFullYear() + dd(d.getMonth()+1) + dd(d.getDate()) +
+      '-' + dd(d.getHours()) + dd(d.getMinutes()) + '.png';
+  }
+
+  function dataUrlToBlob(dataUrl){
+    const partes = dataUrl.split(',');
+    const mime = (partes[0].match(/:(.*?);/) || [null, 'image/png'])[1];
+    const bin = atob(partes[1]);
+    const arr = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {type: mime});
+  }
+
+  /* Salvar a imagem funciona em lugares bem diferentes (app instalado,
+     navegador do celular, navegador do computador), então tentamos do jeito
+     mais completo pro mais simples até um funcionar. */
+  async function saveImageToDevice(dataUrl, filename){
+    if(!dataUrl){ showToast('Nenhuma notinha para baixar ainda.'); return false; }
+    const nome = filename || receiptFileName();
+
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if(plugins && plugins.Filesystem){
+      try{
+        const res = await plugins.Filesystem.writeFile({
+          path: nome, data: dataUrl.split(',')[1], directory: 'DOCUMENTS', recursive: true
+        });
+        showToast('Imagem salva em Documentos.');
+        if(plugins.FileOpener && res && res.uri){
+          try{ await plugins.FileOpener.openFile({ path: res.uri, mimeType: 'image/png' }); }catch(e){}
+        }
+        return true;
+      }catch(e){}
+    }
+
+    let blob = null;
+    try{ blob = dataUrlToBlob(dataUrl); }catch(e){}
+
+    if(blob){
+      try{
+        const file = new File([blob], nome, {type: 'image/png'});
+        if(navigator.canShare && navigator.canShare({files: [file]})){
+          await navigator.share({ files: [file], title: 'Notinha da Sacolinha' });
+          return true;
+        }
+      }catch(e){
+        if(e && e.name === 'AbortError') return false;
+      }
+      try{
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nome;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+        showToast('Imagem baixada.');
+        return true;
+      }catch(e){}
+    }
+
+    try{
+      window.open(dataUrl, '_blank');
+      showToast('Toque e segure na imagem para salvar.');
+      return true;
+    }catch(e){}
+    showToast('Não foi possível salvar a imagem aqui.');
+    return false;
+  }
+
+  async function sendReceiptToCloud(rec){
+    if(!onlineMode || !ensureFirebase() || !userName) return;
+    const local = rec || currentReceipt;
+    if(!local || !local.imagem) return;
+    currentUid = cloudUid();
+    try{
+      const recibo = {
+        imagem: local.imagem, total: local.total, itens: local.itens,
+        lista: local.lista || '', criadoEm: local.criadoEm || Date.now()
+      };
       await firebase.database().ref('listas/'+currentUid+'/recibo').set(recibo);
       trackData(estimateWireBytes(byteSize(recibo)));
-    }catch(e){ /* sem internet no momento — a mensagem de status já foi tentada separadamente */ }
+    }catch(e){ /* sem internet no momento — a notinha já está salva aqui */ }
   }
+
+  $('mainReceiptZoom').addEventListener('click', ()=> openLightbox(currentReceipt && currentReceipt.imagem));
+  $('mainReceiptFull').addEventListener('click', ()=> openLightbox(currentReceipt && currentReceipt.imagem, true));
+  $('mainReceiptDownload').addEventListener('click', ()=>{
+    if(currentReceipt) saveImageToDevice(currentReceipt.imagem, receiptFileName(currentReceipt));
+  });
 
   /* ---------- Recado do observador pro comprador (via mão contrária) ----------
      A mensagem de cima (mensagem) vai de quem compra pra quem observa.
@@ -2687,10 +3135,13 @@
     box.classList.remove('hidden');
     $('observerReceiptImg').src = data.imagem;
     const when = data.criadoEm ? new Date(data.criadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
-    $('observerReceiptWhen').textContent = when ? ('gerado às ' + when + ' · toque pra ampliar') : 'toque pra ampliar';
+    const daLista = data.lista ? (data.lista + ' · ') : '';
+    $('observerReceiptWhen').textContent = daLista + (when ? ('gerado às ' + when + ' · toque pra ampliar') : 'toque pra ampliar');
   }
 
   $('observerReceiptZoom').addEventListener('click', ()=> openLightbox($('observerReceiptImg').getAttribute('src')));
+  $('observerReceiptFull').addEventListener('click', ()=> openLightbox($('observerReceiptImg').getAttribute('src'), true));
+  $('observerReceiptDownload').addEventListener('click', ()=> saveImageToDevice($('observerReceiptImg').getAttribute('src'), receiptFileName()));
 
   function renderObserverItems(list){
     const holder = $('observerLiveList');
@@ -2749,11 +3200,11 @@
     updateDataUsageUI();
     watchStaticAssetUsage();
 
+    await loadLists();
+
     const name = await storageGet('user:name');
     if(name){
       userName = name;
-      const raw = await storageGet('shopping:items');
-      try{ items = raw ? JSON.parse(raw) : []; }catch(e){ items = []; }
       celebrated = items.length > 0 && items.every(i=>i.comprado);
       enterApp();
       if(onlineMode) setOnlineMode(true, {silent:true});
@@ -2775,10 +3226,6 @@
     if(!val){ showToast('Digite seu nome para continuar.'); return; }
     userName = val;
     await storageSet('user:name', val);
-    if(items.length === 0){
-      const raw = await storageGet('shopping:items');
-      try{ items = raw ? JSON.parse(raw) : []; }catch(e){ items = []; }
-    }
     enterApp();
     // Ao trocar de usuário o endereço na nuvem muda: o ouvinte de recado
     // tem que ser religado, senão continua escutando o usuário antigo.
@@ -2806,13 +3253,144 @@
 
   $('clearListBtn').addEventListener('click', async ()=>{
     if(!await askConfirm('Isso apaga todos os itens anotados. Não tem como desfazer.', 'Apagar tudo', 'Limpar a lista')) return;
-    items = [];
+    items.length = 0;
     celebrated = false;
-    await storageSet('shopping:items', JSON.stringify(items));
+    await saveLists();
+    if(currentReceipt && currentReceipt.listId === activeListId) await dropReceipt();
     render();
     clearCloudList();
-    showToast('Lista limpa. Pode começar uma nova!');
+    showToast('Lista limpa. Pode começar de novo!');
   });
+
+  /* ---------- Trocar, criar, renomear e apagar listas ---------- */
+  const listsOverlay = $('listsOverlay');
+
+  function openListsSheet(focarInput){
+    renderListsCollection();
+    $('newListName').value = '';
+    listsOverlay.classList.add('open');
+    closeTopLayer = closeListsSheet;
+    if(focarInput) setTimeout(()=> $('newListName').focus(), 120);
+  }
+  function closeListsSheet(){
+    listsOverlay.classList.remove('open');
+    closeTopLayer = null;
+  }
+
+  function renderListsCollection(){
+    const holder = $('listsCollection');
+    holder.innerHTML = '';
+    lists.forEach(l=>{
+      const comprados = l.itens.filter(i=>i.comprado).length;
+      const resumo = l.itens.length
+        ? (comprados + ' de ' + l.itens.length + ' comprados · ' + formatBRL(listTotal(l.itens)))
+        : 'nenhum item ainda';
+      const row = document.createElement('div');
+      row.className = 'list-row' + (l.id === activeListId ? ' sel' : '');
+      row.innerHTML =
+        '<button class="pick" type="button" data-pick="'+l.id+'">'+
+          '<span class="nm">'+escapeHtml(l.nome)+'</span>'+
+          '<span class="st">'+resumo+(l.id === activeListId ? ' · aberta agora' : '')+'</span>'+
+        '</button>'+
+        '<button class="act" type="button" data-rename="'+l.id+'" title="Renomear lista" aria-label="Renomear '+escapeHtml(l.nome)+'">'+PENCIL_SVG+'</button>'+
+        '<button class="act danger" type="button" data-drop="'+l.id+'" title="Apagar lista" aria-label="Apagar '+escapeHtml(l.nome)+'">'+TRASH_SVG+'</button>';
+      holder.appendChild(row);
+    });
+    holder.querySelectorAll('[data-pick]').forEach(el=>{
+      el.addEventListener('click', ()=> setActiveList(el.getAttribute('data-pick')));
+    });
+    holder.querySelectorAll('[data-rename]').forEach(el=>{
+      el.addEventListener('click', ()=> renameList(el.getAttribute('data-rename')));
+    });
+    holder.querySelectorAll('[data-drop]').forEach(el=>{
+      el.addEventListener('click', ()=> deleteList(el.getAttribute('data-drop')));
+    });
+  }
+
+  async function setActiveList(id, ehNova){
+    const alvo = lists.find(l=>l.id === id);
+    if(!alvo) return;
+    if(alvo.id === activeListId && !ehNova){ closeListsSheet(); return; }
+    const anterior = activeList();
+    if(anterior) anterior.itens = items;
+    activeListId = alvo.id;
+    items = alvo.itens;
+    celebrated = items.length > 0 && items.every(i=>i.comprado);
+    await saveLists();
+    render();
+    closeListsSheet();
+    if(!ehNova) showToast('Você está na lista "' + alvo.nome + '".');
+    // Quem estiver observando passa a ver a lista nova, não a antiga.
+    if(onlineMode){
+      await clearCloudList();
+      fullSyncToCloud(true);
+    }
+  }
+
+  async function createList(nome){
+    const nm = (nome || '').trim() || defaultListName();
+    if(lists.some(l => (l.nome||'').toLowerCase() === nm.toLowerCase())){
+      showToast('Já existe uma lista com esse nome.');
+      return;
+    }
+    const nova = { id: newListId(), nome: nm, criadoEm: Date.now(), itens: [] };
+    lists.push(nova);
+    await setActiveList(nova.id, true);
+    showToast('Lista "' + nm + '" criada. Pode começar a anotar!');
+  }
+
+  async function renameList(id){
+    const alvo = lists.find(l=>l.id === id);
+    if(!alvo) return;
+    const resposta = await askText('Renomear lista', alvo.nome);
+    if(resposta === null) return;
+    const nm = resposta.trim();
+    if(!nm){ showToast('O nome não pode ficar vazio.'); return; }
+    if(lists.some(l => l.id !== id && (l.nome||'').toLowerCase() === nm.toLowerCase())){
+      showToast('Já existe uma lista com esse nome.');
+      return;
+    }
+    alvo.nome = nm;
+    await saveLists();
+    renderListsCollection();
+    render();
+    showToast('Nome salvo!');
+  }
+
+  async function deleteList(id){
+    if(lists.length <= 1){ showToast('Você precisa de pelo menos uma lista.'); return; }
+    const alvo = lists.find(l=>l.id === id);
+    if(!alvo) return;
+    const quantos = alvo.itens.length;
+    const aviso = quantos
+      ? 'A lista "'+alvo.nome+'" e os '+quantos+(quantos === 1 ? ' item dela' : ' itens dela')+' vão embora. Não tem como desfazer.'
+      : 'A lista "'+alvo.nome+'" vai embora. Não tem como desfazer.';
+    if(!await askConfirm(aviso, 'Apagar lista', 'Apagar lista')) return;
+
+    const eraAtiva = alvo.id === activeListId;
+    lists = lists.filter(l=>l.id !== id);
+    if(currentReceipt && currentReceipt.listId === id) await dropReceipt();
+    if(eraAtiva){
+      activeListId = lists[0].id;
+      items = lists[0].itens;
+      celebrated = items.length > 0 && items.every(i=>i.comprado);
+      if(onlineMode){
+        await clearCloudList();
+        fullSyncToCloud(true);
+      }
+    }
+    await saveLists();
+    renderListsCollection();
+    render();
+    showToast('Lista apagada.');
+  }
+
+  $('listPickerBtn').addEventListener('click', ()=> openListsSheet(false));
+  $('newListBtn').addEventListener('click', ()=> openListsSheet(true));
+  $('closeListsBtn').addEventListener('click', closeListsSheet);
+  listsOverlay.addEventListener('click', (e)=>{ if(e.target === listsOverlay) closeListsSheet(); });
+  $('createListConfirmBtn').addEventListener('click', ()=> createList($('newListName').value));
+  $('newListName').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') createList($('newListName').value); });
 
   /* ---------- Category picker ---------- */
   function buildCatSelect(){
@@ -2924,29 +3502,52 @@
   });
 
   /* ---------- Modal open/close ---------- */
-  function openModal(){
-    selectedCategory = 'mercearia';
-    selectedPhoto = null;
+  function syncPhotoUI(){
+    if(selectedPhoto){
+      $('photoPreviewImg').src = selectedPhoto;
+      $('photoPreview').classList.remove('hidden');
+      $('photoInputWrap').classList.add('hidden');
+    }else{
+      $('photoPreview').classList.add('hidden');
+      $('photoInputWrap').classList.remove('hidden');
+    }
+  }
+
+  /* Sem argumento = anotar item novo. Com um item = corrigir o que já está
+     na lista (nome digitado errado, preço trocado, categoria, foto...). */
+  function openModal(editItem){
+    editingId = editItem ? editItem.id : null;
+    selectedCategory = editItem ? (editItem.categoria || 'mercearia') : 'mercearia';
+    selectedPhoto = editItem ? (editItem.foto || null) : null;
     pickedProduct = null;
     hideSuggest();
     showPickedIcon(null);
     $('catalogCount').textContent = CATALOG_TOTAL.toLocaleString('pt-BR');
-    $('itemName').value = '';
-    $('itemQty').value = '1';
-    $('itemUnit').value = 'un';
-    $('itemPrice').value = '';
-    $('itemObs').value = '';
-    $('photoPreview').classList.add('hidden');
-    $('photoInputWrap').classList.remove('hidden');
+    $('itemName').value = editItem ? (editItem.nome || '') : '';
+    $('itemQty').value = editItem && editItem.quantidade != null ? editItem.quantidade : '1';
+    $('itemUnit').value = editItem ? (editItem.unidade || 'un') : 'un';
+    $('itemPrice').value = editItem && editItem.preco ? editItem.preco : '';
+    $('itemObs').value = editItem ? (editItem.observacao || '') : '';
     $('photoInput').value = '';
+    syncPhotoUI();
+    $('modalTitle').textContent = editItem ? 'Corrigir item' : 'Anotar item';
+    $('saveItemBtn').textContent = editItem ? 'Salvar correção' : 'Anotar';
+    $('finishAddBtn').textContent = editItem ? 'Cancelar' : 'Concluir';
+    $('modalHint').textContent = editItem
+      ? 'Arrume o que estiver errado e toque em "Salvar correção".'
+      : 'Cada item já entra como comprado assim que você clica em "Anotar". Digitou errado? Toque no lápis do item pra corrigir.';
     buildCatSelect();
     modalOverlay.classList.add('open');
-    restoreItemDraft();
+    if(!editItem) restoreItemDraft();
     setTimeout(()=> $('itemName').focus(), 100);
   }
-  function closeModal(){ saveItemDraft(); modalOverlay.classList.remove('open'); }
-  $('createListBtn').addEventListener('click', openModal);
-  $('fabAdd').addEventListener('click', openModal);
+  function closeModal(){
+    saveItemDraft();
+    editingId = null;
+    modalOverlay.classList.remove('open');
+  }
+  $('createListBtn').addEventListener('click', ()=> openModal());
+  $('fabAdd').addEventListener('click', ()=> openModal());
   $('closeModalBtn').addEventListener('click', closeModal);
   $('finishAddBtn').addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', (e)=>{ if(e.target === modalOverlay) closeModal(); });
@@ -3006,6 +3607,29 @@
       if(g && (nn.indexOf(g.k) === 0 || g.k.indexOf(nn) === 0)) icone = g.emoji;
     }
 
+    // Modo correção: arruma o item que já existe em vez de criar outro.
+    if(editingId){
+      const alvo = items.find(i=>i.id === editingId);
+      if(!alvo){ showToast('Esse item já saiu da lista.'); closeModal(); return; }
+      const nomeMudou = norm(alvo.nome || '') !== norm(name);
+      alvo.nome = name;
+      alvo.quantidade = qty;
+      alvo.unidade = unit;
+      alvo.preco = preco;
+      alvo.categoria = selectedCategory;
+      alvo.observacao = obs;
+      alvo.foto = selectedPhoto;
+      // Se o nome não mudou, mantém a imagem que o item já tinha.
+      alvo.icone = nomeMudou ? icone : (alvo.icone || icone);
+      alvo.editadoEm = Date.now();
+      await saveLists();
+      render();
+      syncItemToCloud(alvo);
+      showToast('Item corrigido!');
+      closeModal();
+      return;
+    }
+
     const newItem = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       nome: name, quantidade: qty, unidade: unit, preco: preco, categoria: selectedCategory,
@@ -3013,7 +3637,7 @@
     };
     items.push(newItem);
     celebrated = false;
-    await storageSet('shopping:items', JSON.stringify(items));
+    await saveLists();
     render();
     syncItemToCloud(newItem);
     showToast('Item anotado!');
@@ -3042,14 +3666,17 @@
       // sem isso, desmarcar e marcar de novo nunca comemorava outra vez
       if(!it.comprado) celebrated = false;
     }
-    await storageSet('shopping:items', JSON.stringify(items));
+    await saveLists();
     render();
     if(it) syncItemToCloud(it);
   }
   async function deleteItem(id){
-    items = items.filter(i=>i.id !== id);
+    // splice em vez de filter: `items` é o mesmo array guardado dentro da
+    // lista ativa, então trocar a referência perderia o vínculo.
+    const pos = items.findIndex(i=>i.id === id);
+    if(pos >= 0) items.splice(pos, 1);
     celebrated = false;
-    await storageSet('shopping:items', JSON.stringify(items));
+    await saveLists();
     render();
     removeItemFromCloud(id);
   }
@@ -3079,6 +3706,11 @@
     const total = items.length;
     const done = items.filter(i=>i.comprado).length;
     const pct = total ? Math.round((done/total)*100) : 0;
+
+    const aberta = activeList();
+    $('activeListName').textContent = aberta ? aberta.nome : 'Minha lista';
+    $('activeListCount').textContent = total ? (done + '/' + total) : 'vazia';
+    renderMainReceipt();
     $('progressCount').textContent = done + ' de ' + total + ' comprados';
     $('progressPct').textContent = pct + '%';
     $('progressFill').style.width = pct + '%';
@@ -3091,9 +3723,12 @@
     $('broadcastCard').classList.remove('hidden');
     $('broadcastHint').textContent = onlineMode
       ? 'Quem estiver te observando vê essa mensagem na hora.'
-      : 'Só funciona com o modo online ligado.';
+      : 'Sem modo online o aviso não sai, mas "Finalizar compra" gera a sua notinha do mesmo jeito.';
     $('broadcastSendBtn').disabled = !onlineMode;
-    document.querySelectorAll('.quick-status-btn').forEach(btn=> btn.disabled = !onlineMode);
+    // "Finalizar compra" vale offline: a notinha é montada aqui no aparelho.
+    document.querySelectorAll('.quick-status-btn').forEach(btn=>{
+      btn.disabled = btn.id === 'statusFinalizarBtn' ? false : !onlineMode;
+    });
 
     if(total > 0 && done === total && !celebrated){
       celebrated = true;
@@ -3155,6 +3790,7 @@
             'aria-checked="'+(it.comprado ? 'true' : 'false')+'" aria-label="Marcar '+escapeHtml(it.nome)+' como comprado">'+
             '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'+
           '</div>'+
+          '<button class="edit-btn" type="button" data-edit="'+it.id+'" title="Corrigir item" aria-label="Corrigir '+escapeHtml(it.nome)+'">'+PENCIL_SVG+'</button>'+
           '<button class="del-btn" type="button" data-del="'+it.id+'" title="Remover item" aria-label="Remover '+escapeHtml(it.nome)+'">✕</button>';
 
         group.appendChild(card);
@@ -3167,6 +3803,13 @@
       el.addEventListener('click', ()=> toggleItem(el.getAttribute('data-id')));
       el.addEventListener('keydown', (e)=>{
         if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleItem(el.getAttribute('data-id')); }
+      });
+    });
+    listContainer.querySelectorAll('[data-edit]').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const alvo = items.find(i=>i.id === el.getAttribute('data-edit'));
+        if(alvo) openModal(alvo);
       });
     });
     listContainer.querySelectorAll('[data-del]').forEach(el=>{
@@ -3190,24 +3833,6 @@
     });
   }
 })();
-</script>
-<script src="update-checker.js"></script>
-<script>
-  // Selo de versão visível, só para teste do sistema de atualização.
-  // Lê o version.txt local (arquivo do próprio app, sem CORS) — é o número
-  // que o workflow do GitHub grava sozinho a cada build.
-  (function(){
-    var badge = document.createElement('div');
-    badge.textContent = 'v...';
-    badge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'
-      + 'background:rgba(31,68,54,0.85);color:#fff;font:12px sans-serif;'
-      + 'padding:4px 8px;border-radius:8px;pointer-events:none;';
-    document.body.appendChild(badge);
-    fetch('version.txt', {cache:'no-store'})
-      .then(function(r){ return r.text(); })
-      .then(function(t){ badge.textContent = 'v' + t.trim(); })
-      .catch(function(){ badge.textContent = 'v?'; });
-  })();
 </script>
 </body>
 </html>
