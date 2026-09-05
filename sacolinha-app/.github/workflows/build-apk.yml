@@ -1,0 +1,95 @@
+name: Build APK de HTML Local
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Criar package.json e instalar Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/filesystem @capawesome-team/capacitor-file-opener
+
+      - name: Inicializar e Sincronizar Projeto Android
+        run: |
+          npx cap init "Sacolinha" "com.bramu.sacolinha" --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Permitir salvar e abrir a imagem da notinha
+        run: |
+          # Arquivo exigido pelo plugin de abrir arquivo (FileProvider), que
+          # informa quais pastas do app podem ser compartilhadas com a galeria
+          # e com outros aplicativos.
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="cache" path="." />
+              <files-path name="files" path="." />
+              <external-files-path name="external-files" path="." />
+              <external-cache-path name="external-cache" path="." />
+          </paths>
+          EOF
+
+      - name: Aplicar ícone do app (usa resources/icon.png, icon-foreground.png e icon-background.png)
+        run: |
+          npm install @capacitor/assets
+          npx capacitor-assets generate --android
+          npx cap sync android
+
+      - name: Fixar versionCode crescente (evita conflito de "downgrade" na instalação)
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+
+      - name: Corrigir conflito de dependência Kotlin
+        run: |
+          cat <<'EOF' >> android/app/build.gradle
+
+          configurations.all {
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+          }
+          EOF
+
+      - name: Usar chave de assinatura fixa (evita precisar desinstalar)
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+
+      - name: Dar permissão de execução ao Gradle
+        run: chmod +x android/gradlew
+
+      - name: Compilar o APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Publicar Release automaticamente
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Última versão"
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
